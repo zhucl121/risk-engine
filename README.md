@@ -8,6 +8,8 @@
 
 **RiskEngine** is a high-performance, open-source risk decision engine written in Go. It is designed for real-time fraud detection in payment, marketing promotion, and transaction scenarios. It delivers **P99 < 60ms** decisions at **20,000+ TPS** on commodity hardware.
 
+> 中文文档：[README_zh.md](README_zh.md)
+
 ---
 
 ## Features
