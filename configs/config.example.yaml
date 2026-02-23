@@ -38,6 +38,24 @@ feature:
   redis_timeout: "10ms"
   external_timeout: "30ms"
 
+feature_store:
+  # Set enabled: true to connect to the standalone Feature Store gRPC service.
+  # When false (default), only in-process fetchers (velocity, etc.) are used.
+  enabled: false
+  # gRPC endpoint of the Feature Store service.
+  # Use "localhost:9100" for sidecar mode, or the k8s service DNS for standalone.
+  addr: "localhost:9100"
+  dial_timeout: "5s"
+  # Per-RPC deadline for feature fetch calls from the decision engine.
+  request_timeout: "20ms"
+  # List of feature groups to fetch from the store.
+  # Each entry creates one FeatureStoreFetcher registered in feature.Service.
+  groups:
+    - name: "user_profile"
+      timeout: "15ms"
+    - name: "velocity"
+      timeout: "10ms"
+
 log:
   level: "info"    # debug | info | warn | error
   format: "json"   # json | console

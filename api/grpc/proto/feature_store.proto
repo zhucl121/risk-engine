@@ -1,0 +1,82 @@
+// Copyright 2026 RiskEngine Contributors
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package riskengine.v1;
+
+option go_package = "github.com/yourorg/riskengine/api/grpc/v1;riskv1";
+
+// FeatureStoreService provides batch feature lookup for the decision engine.
+// It is designed to be deployed as a sidecar or standalone microservice.
+service FeatureStoreService {
+  // GetFeatures fetches a named set of features for a single entity context.
+  rpc GetFeatures(GetFeaturesRequest) returns (GetFeaturesResponse);
+
+  // BatchGetFeatures fetches features for multiple entity contexts in one RPC.
+  rpc BatchGetFeatures(BatchGetFeaturesRequest) returns (BatchGetFeaturesResponse);
+
+  // Health returns the store's operational status.
+  rpc Health(FeatureStoreHealthRequest) returns (FeatureStoreHealthResponse);
+}
+
+// EntityContext carries the identifiers for a decision request.
+message EntityContext {
+  string user_id    = 1;
+  string device_id  = 2;
+  string session_id = 3;
+  string ip         = 4;
+  // extra holds additional entity attributes (e.g. merchant_id, coupon_id).
+  map<string, string> extra = 5;
+}
+
+// GetFeaturesRequest asks for a named group of features for one entity.
+message GetFeaturesRequest {
+  // request_id for tracing (echoed back in response).
+  string request_id = 1;
+  // feature_group identifies which set of features to fetch
+  // (e.g. "velocity", "user_profile", "device_risk").
+  string feature_group = 2;
+  EntityContext entity = 3;
+}
+
+// FeatureValue is a tagged union for feature values.
+message FeatureValue {
+  oneof value {
+    int64  int_val    = 1;
+    double float_val  = 2;
+    string string_val = 3;
+    bool   bool_val   = 4;
+  }
+}
+
+// GetFeaturesResponse returns a named map of feature values.
+message GetFeaturesResponse {
+  string request_id              = 1;
+  string feature_group           = 2;
+  // features maps feature key → value.
+  map<string, FeatureValue> features = 3;
+  // missing_keys lists keys that were requested but had no data.
+  repeated string missing_keys   = 4;
+  // fetch_ms is the server-side computation latency.
+  int64 fetch_ms                 = 5;
+}
+
+// BatchGetFeaturesRequest bundles multiple GetFeaturesRequests.
+message BatchGetFeaturesRequest {
+  repeated GetFeaturesRequest requests = 1;
+}
+
+// BatchGetFeaturesResponse bundles the corresponding responses.
+message BatchGetFeaturesResponse {
+  repeated GetFeaturesResponse responses = 1;
+}
+
+message FeatureStoreHealthRequest {}
+
+message FeatureStoreHealthResponse {
+  bool   healthy  = 1;
+  string message  = 2;
+  // backend_statuses maps backend name → healthy.
+  map<string, bool> backend_statuses = 3;
+}

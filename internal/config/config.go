@@ -13,12 +13,13 @@ import (
 
 // Config is the root configuration struct.
 type Config struct {
-	Server  ServerConfig  `mapstructure:"server"`
-	Redis   RedisConfig   `mapstructure:"redis"`
-	Kafka   KafkaConfig   `mapstructure:"kafka"`
-	Engine  EngineConfig  `mapstructure:"engine"`
-	Feature FeatureConfig `mapstructure:"feature"`
-	Log     LogConfig     `mapstructure:"log"`
+	Server       ServerConfig       `mapstructure:"server"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	Kafka        KafkaConfig        `mapstructure:"kafka"`
+	Engine       EngineConfig       `mapstructure:"engine"`
+	Feature      FeatureConfig      `mapstructure:"feature"`
+	FeatureStore FeatureStoreConfig `mapstructure:"feature_store"`
+	Log          LogConfig          `mapstructure:"log"`
 }
 
 // ServerConfig holds HTTP/gRPC server settings.
@@ -59,6 +60,31 @@ type FeatureConfig struct {
 	TotalTimeout    time.Duration `mapstructure:"total_timeout"`
 	RedisTimeout    time.Duration `mapstructure:"redis_timeout"`
 	ExternalTimeout time.Duration `mapstructure:"external_timeout"`
+}
+
+// FeatureStoreConfig holds settings for the standalone Feature Store service.
+type FeatureStoreConfig struct {
+	// Enabled controls whether the decision engine connects to an external
+	// Feature Store. When false, only in-process fetchers are used.
+	Enabled bool `mapstructure:"enabled"`
+	// Addr is the Feature Store gRPC endpoint (e.g. "feature-store:9100").
+	// Also used as the listen address when running cmd/featurestore.
+	Addr string `mapstructure:"addr"`
+	// DialTimeout is the maximum time to wait for the initial connection.
+	DialTimeout time.Duration `mapstructure:"dial_timeout"`
+	// RequestTimeout is the per-RPC deadline for feature fetch calls.
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+	// Groups lists the feature groups to fetch from the store.
+	// Each group maps to one FeatureStoreFetcher registered in feature.Service.
+	Groups []FeatureStoreGroupConfig `mapstructure:"groups"`
+}
+
+// FeatureStoreGroupConfig configures one feature group fetched from the store.
+type FeatureStoreGroupConfig struct {
+	// Name must match a registered FeatureGroup on the server side.
+	Name string `mapstructure:"name"`
+	// Timeout overrides the global RequestTimeout for this group.
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 // LogConfig holds logger settings.
@@ -102,6 +128,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("feature.total_timeout", "50ms")
 	v.SetDefault("feature.redis_timeout", "10ms")
 	v.SetDefault("feature.external_timeout", "30ms")
+	v.SetDefault("feature_store.enabled", false)
+	v.SetDefault("feature_store.addr", ":9100")
+	v.SetDefault("feature_store.dial_timeout", "5s")
+	v.SetDefault("feature_store.request_timeout", "20ms")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
 }

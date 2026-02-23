@@ -33,6 +33,7 @@ import (
 	"github.com/yourorg/riskengine/internal/engine"
 	"github.com/yourorg/riskengine/internal/feature"
 	"github.com/yourorg/riskengine/internal/feature/fetchers"
+	"github.com/yourorg/riskengine/internal/featurestore"
 	"github.com/yourorg/riskengine/internal/list"
 	mw "github.com/yourorg/riskengine/internal/middleware"
 	"github.com/yourorg/riskengine/internal/health"
@@ -129,10 +130,39 @@ func main() {
 	// Prometheus metrics endpoint (not protected by rate-limit or auth).
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
+	// ── Feature Store client（可选）────────────────────────────────────────────
+	var fsClient *featurestore.Client
+	if cfg.FeatureStore.Enabled {
+		fsCfg := featurestore.DefaultClientConfig(cfg.FeatureStore.Addr)
+		fsCfg.DialTimeout = cfg.FeatureStore.DialTimeout
+		fsCfg.RequestTimeout = cfg.FeatureStore.RequestTimeout
+		fsClient, err = featurestore.NewClient(fsCfg, logger)
+		if err != nil {
+			logger.Fatal("feature store client init failed", zap.Error(err))
+		}
+		defer fsClient.Close() //nolint:errcheck
+
+		// Register one FeatureStoreFetcher per configured group.
+		for _, grpCfg := range cfg.FeatureStore.Groups {
+			timeout := grpCfg.Timeout
+			if timeout == 0 {
+				timeout = cfg.FeatureStore.RequestTimeout
+			}
+			featureSvc.Register(featurestore.NewFetcher(fsClient, grpCfg.Name, timeout, logger))
+		}
+		logger.Info("feature store fetchers registered",
+			zap.Int("groups", len(cfg.FeatureStore.Groups)),
+			zap.String("addr", cfg.FeatureStore.Addr),
+		)
+	}
+
 	// ── Health checker ────────────────────────────────────────────────────────
 	healthChecker := health.NewCompositeChecker(
 		health.NewRedisChecker("redis", redisClient),
 	)
+	if fsClient != nil {
+		healthChecker.Add(featurestore.NewHealthChecker(fsClient))
+	}
 
 	apiV1 := router.Group("/api/v1")
 	v1.NewHandler(eng, logger).

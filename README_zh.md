@@ -262,6 +262,94 @@ gRPC 默认监听 `:9090`。
 
 ---
 
+## Feature Store（独立特征服务）
+
+特征拉取支持两种模式，可按需选择或混合使用：
+
+### 模式对比
+
+```
+模式一（默认）：进程内 Fetcher，直连 Redis
+RiskEngine 进程
+  └── feature.Service
+        ├── VelocityFetcher  ──→ Redis（pkg/sliding）
+        └── PromoVelocityFetcher ──→ Redis
+
+模式二：外部 Feature Store，通过 gRPC 调用
+RiskEngine 进程                     Feature Store 进程（cmd/featurestore）
+  └── feature.Service                     └── FeatureStoreService
+        └── FeatureStoreFetcher ──gRPC──→       ├── VelocityGroup   → Redis
+                                                └── UserProfileGroup → Redis JSON
+```
+
+### 启动独立 Feature Store
+
+```bash
+# Feature Store 默认监听 :9100
+go run ./cmd/featurestore -config configs/config.yaml
+```
+
+### 决策引擎接入 Feature Store
+
+在 `configs/config.yaml` 中开启：
+
+```yaml
+feature_store:
+  enabled: true
+  addr: "localhost:9100"    # sidecar 用 localhost，k8s 用 ClusterIP DNS
+  request_timeout: "20ms"
+  groups:
+    - name: "user_profile"  # 对应 Feature Store 中注册的 FeatureGroup.Name()
+      timeout: "15ms"
+    - name: "velocity"
+      timeout: "10ms"
+```
+
+启动后，`feature.Service` 会同时并发调用进程内 Fetcher 和 gRPC Fetcher，结果合并入同一个 `feature.Map`。
+
+### 自定义 FeatureGroup
+
+在 Feature Store 服务中实现 `store.FeatureGroup` 接口：
+
+```go
+type MyGroup struct{ db *sql.DB }
+
+func (g *MyGroup) Name() string { return "my_group" }
+
+func (g *MyGroup) Fetch(ctx context.Context, entity *riskv1.EntityContext) (
+    map[string]*riskv1.FeatureValue, []string, error,
+) {
+    // 从数据库 / 外部 API 查询特征
+    return map[string]*riskv1.FeatureValue{
+        "my_feature": {Value: &riskv1.FeatureValue_IntVal{IntVal: 100}},
+    }, nil, nil
+}
+```
+
+注册到 store：
+
+```go
+registry.Register(&MyGroup{db: db})
+```
+
+Feature Store 重启后决策引擎会自动重连（gRPC retry policy 已内置）。
+
+### 健康检查
+
+Feature Store 客户端自动接入 `/api/v1/readyz`：
+
+```json
+{
+  "ready": false,
+  "checks": [
+    {"name": "redis", "healthy": true},
+    {"name": "feature-store", "healthy": false, "message": "grpc health: connection refused"}
+  ]
+}
+```
+
+---
+
 ## 扩展开发
 
 ### 添加规则
