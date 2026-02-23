@@ -1,0 +1,43 @@
+# RiskEngine Example Configuration
+# Copy to config.yaml and fill in your values.
+# All durations accept Go duration syntax: 10ms, 5s, 1m, etc.
+
+server:
+  addr: ":8080"
+  grpc_addr: ":9090"
+  read_timeout: "10s"
+  write_timeout: "10s"
+  idle_timeout: "60s"
+  drain_timeout: "30s"
+
+redis:
+  # Single node: one address. Cluster mode: multiple addresses.
+  addrs:
+    - "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 50
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  audit_topic: "risk.decisions"
+
+engine:
+  # Directory containing PolicySet YAML files (one file per scene).
+  policy_dir: "configs/policies"
+  # Interval between hot-reload checks for policy/rule changes.
+  reload_interval: "30s"
+  # Global fallback when no policy matches the requested scene.
+  fallback: "PASS"
+
+feature:
+  # Maximum time budget for all parallel feature fetches combined.
+  total_timeout: "50ms"
+  # Per-fetcher timeouts (individual fetchers can override these).
+  redis_timeout: "10ms"
+  external_timeout: "30ms"
+
+log:
+  level: "info"    # debug | info | warn | error
+  format: "json"   # json | console

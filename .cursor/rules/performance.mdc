@@ -1,0 +1,59 @@
+---
+description: Performance and GC optimization rules for riskengine hot paths. Apply when working on engine evaluation, feature fetching, or rule matching code.
+globs: internal/{engine,rule,feature}/**/*.go
+alwaysApply: false
+---
+
+# Performance Rules – Hot Paths
+
+## Object Pool Pattern
+Use `sync.Pool` for `DecisionContext`, `FeatureMap`, and `RuleResult`:
+
+```go
+// ✅ GOOD
+var ctxPool = sync.Pool{New: func() any { return &DecisionContext{} }}
+ctx := ctxPool.Get().(*DecisionContext)
+ctx.Reset()          // always reset before use
+defer ctxPool.Put(ctx)
+
+// ❌ BAD – allocates on every request
+ctx := &DecisionContext{}
+```
+
+## Parallel Feature Fetch
+```go
+// ✅ GOOD – errgroup with deadline
+g, gctx := errgroup.WithContext(ctx)
+g.Go(func() error { return fetchRedis(gctx, &result.UserFeatures) })
+g.Go(func() error { return fetchDevice(gctx, &result.DeviceFeatures) })
+_ = g.Wait()  // degraded result on partial timeout is acceptable
+
+// ❌ BAD – sequential fetch wastes 3× latency
+```
+
+## Map Pre-allocation
+```go
+// ✅ GOOD
+features := make(FeatureMap, 32)   // known approximate size
+
+// ❌ BAD
+features := FeatureMap{}
+```
+
+## CGO Isolation for ONNX
+ONNX inference via CGO MUST run in a dedicated pool:
+```go
+// Submitted to onnxPool (chan), never called from arbitrary goroutine
+// Reason: CGO locks OS thread; mixing with goroutine scheduler causes latency spikes
+```
+
+## GC Tuning (set in main.go)
+```go
+runtime.GOMAXPROCS(runtime.NumCPU())
+// Set via env: GOGC=200 GOMEMLIMIT=1GiB
+// Do NOT hardcode; let ops configure per environment
+```
+
+## Benchmark Requirements
+Every new evaluator or fetcher MUST have a `BenchmarkXxx` function.
+Target: rule eval < 500µs/op for 100 rules, feature fetch < 10ms P99.

@@ -1,0 +1,61 @@
+---
+description: Risk engine domain model and architecture rules. Apply when working on engine, rule, feature, model, orchestrator packages.
+globs: internal/**/*.go
+alwaysApply: false
+---
+
+# RiskEngine Domain Rules
+
+## Core Abstractions (never break these interfaces)
+
+```
+DecisionRequest  →  Engine.Evaluate()  →  DecisionResult
+                         │
+              ┌──────────┼──────────┐
+         RuleEngine  ModelEngine  ListService
+              └──────────┼──────────┘
+                   FeatureService
+```
+
+## Decision Result Schema
+Every `DecisionResult` MUST contain:
+- `RequestID` string (UUID v4)
+- `Decision` enum: PASS | REJECT | MANUAL_REVIEW
+- `RiskScore` int (0–1000)
+- `HitRules` []string
+- `ModelScores` map[string]float64
+- `RiskReasons` []string (reason codes, not free text)
+- `CostMs` int64
+
+## Rule Package Conventions
+- One rule = one struct implementing `Rule` interface
+- Rules are stateless; state lives in FeatureService
+- Rule conditions use `pkg/expr` evaluator (never raw `eval`)
+- Hot-reload via double-buffer + atomic pointer swap
+
+## Feature Package Conventions
+- `FeatureFetcher` interface: `Fetch(ctx, key) (FeatureMap, error)`
+- Parallel fetch with 50ms total budget; per-fetcher timeout in config
+- On timeout: log warn + use zero-value fallback (never block decision)
+- Velocity features MUST use `pkg/sliding` window (Redis Lua atomic)
+
+## Model Package Conventions
+- Models loaded as ONNX via `pkg/onnx` wrapper (CGO pool-isolated)
+- Model inference runs in dedicated goroutine pool (size = NumCPU)
+- Champion-Challenger: traffic split via `orchestrator.ABRouter`
+
+## Orchestrator Conventions
+- Pipeline steps defined as DAG in YAML config; no hardcoded order
+- Each step declares `timeout`, `parallel`, `onFailure` (SKIP|REJECT|FALLBACK)
+- Result aggregation strategy configurable: HIGHEST_RISK | WEIGHTED | RULE_FIRST
+
+## List Service Conventions
+- L1: in-process Bloom filter (false-positive 0.1%)
+- L2: Redis with TTL
+- L3: persistent store (exact match)
+- Query always starts at L1; short-circuit on miss
+
+## Audit
+- Every decision writes an `AuditRecord` to Kafka topic `risk.decisions`
+- AuditRecord includes full feature snapshot + decision path
+- Never log PII in plaintext; mask card numbers, phone numbers

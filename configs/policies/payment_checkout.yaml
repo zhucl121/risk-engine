@@ -1,0 +1,48 @@
+# PolicySet for payment checkout scene.
+# Each step runs in order unless parallel: true is set, in which case it
+# runs concurrently with other parallel steps.
+
+scene: PAYMENT_CHECKOUT
+version: "1.0.0"
+
+pipeline:
+  # Step 1: List check — fast-path rejection for known bad entities.
+  # If any entity is blacklisted the decision short-circuits immediately.
+  - name: list_check
+    kind: LIST
+    timeout: 5ms
+    parallel: false
+    onFailure: SKIP   # skip list check on Redis unavailability; don't block
+
+  # Step 2 + 3 run in parallel to reduce total latency.
+
+  # Step 2: Rule evaluation — YAML-defined rules for known fraud patterns.
+  - name: rule_engine
+    kind: RULE
+    ruleGroup: payment_rules
+    timeout: 25ms
+    parallel: true
+    onFailure: SKIP
+
+  # Step 3: ML model scoring — XGBoost fraud probability.
+  - name: model_scoring
+    kind: MODEL
+    models:
+      - payment_fraud_xgb
+      - device_risk_lr
+    timeout: 30ms
+    parallel: true
+    onFailure: SKIP
+
+  # Step 4: Aggregate — merge results from all upstream steps.
+  - name: aggregate
+    kind: AGGREGATE
+    strategy: HIGHEST_RISK  # take the most severe decision from any step
+
+# Fallback decision when the pipeline fails completely (e.g. all steps skipped).
+fallback: PASS_WITH_MONITOR
+
+abTest:
+  enabled: false
+  experimentId: ""
+  splitPct: 0.0

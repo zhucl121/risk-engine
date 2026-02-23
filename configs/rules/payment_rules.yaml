@@ -1,0 +1,52 @@
+# Payment scene rule definitions.
+# Rules are evaluated in priority order (higher = first).
+# A REJECT decision short-circuits remaining rules when shortCircuit: true on the evaluator.
+
+group: payment_rules
+shortCircuit: true
+
+rules:
+  - id: DEVICE_MULTI_ACCOUNT_001
+    name: "设备关联多账号检测"
+    priority: 200
+    condition: "features['device.linked_account_count_7d'] > 5 && features['user.register_days'] < 30"
+    action:
+      decision: REJECT
+      riskCode: DEVICE_MULTI_ACCOUNT
+      score: 850
+
+  - id: HIGH_VELOCITY_PAY_001
+    name: "短时高频支付检测"
+    priority: 190
+    condition: "features['velocity.pay_count_1min'] > 5"
+    action:
+      decision: REJECT
+      riskCode: HIGH_VELOCITY_PAYMENT
+      score: 900
+
+  - id: DATACENTER_IP_LARGE_AMT_001
+    name: "数据中心IP大额交易"
+    priority: 180
+    condition: "features['ip.is_datacenter'] == true && amount > 100000"
+    action:
+      decision: MANUAL_REVIEW
+      riskCode: DATACENTER_IP_HIGH_AMOUNT
+      score: 700
+
+  - id: NEW_DEVICE_HIGH_AMT_001
+    name: "新设备大额交易"
+    priority: 170
+    condition: "features['user.register_days'] < 7 && amount > 50000"
+    action:
+      decision: MANUAL_REVIEW
+      riskCode: NEW_USER_HIGH_AMOUNT
+      score: 650
+
+  - id: HISTORY_FRAUD_001
+    name: "历史欺诈用户"
+    priority: 300
+    condition: "features['user.history_fraud_count'] > 0"
+    action:
+      decision: REJECT
+      riskCode: USER_HISTORY_FRAUD
+      score: 950

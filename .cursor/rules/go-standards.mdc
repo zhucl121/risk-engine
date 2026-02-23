@@ -1,0 +1,46 @@
+---
+description: Go coding standards for riskengine project. Apply to all Go files.
+globs: **/*.go
+alwaysApply: false
+---
+
+# Go Standards – riskengine
+
+## Error Handling
+- Always wrap errors with context: `fmt.Errorf("operation %s: %w", name, err)`
+- Define sentinel errors in `errors.go` of each package using `errors.New`
+- Never ignore errors with `_` unless explicitly commented with reason
+
+## Naming
+- Interfaces: suffix `er` (e.g., `RuleEvaluator`, `FeatureFetcher`)
+- Constructors: `New<Type>(...)` returning `(*Type, error)`
+- Context always first parameter: `func Foo(ctx context.Context, ...)`
+- Unexported fields in structs; expose via methods
+
+## Concurrency
+- Use `errgroup.WithContext` for parallel goroutines with timeout
+- Always pass `context.Context`; respect cancellation in loops
+- Use `sync.Pool` for frequently allocated objects (DecisionContext, FeatureMap)
+- Protect shared state with `sync.RWMutex`; prefer atomic for counters
+
+## Performance
+- Pre-allocate slices/maps with known capacity: `make([]T, 0, n)`
+- Reuse objects via `sync.Pool`; reset before returning to pool
+- Avoid `interface{}` boxing in hot paths; use concrete types
+- Profile before optimizing; benchmark critical paths with `testing.B`
+
+## Testing
+- Table-driven tests; subtests with `t.Run`
+- Mock interfaces with `mockery` or hand-written fakes in `_test` files
+- Benchmarks for rule evaluation and feature fetching hot paths
+- Integration tests under `internal/<pkg>/testdata/`
+
+## Logging & Observability
+- Use `go.uber.org/zap` structured logger; never `fmt.Println` in production code
+- Propagate `TraceID` via context; extract in middleware
+- Export Prometheus metrics from each subsystem via `pkg/metrics`
+
+## Module
+- Module: `github.com/yourorg/riskengine`
+- Min Go version: 1.22
+- Prefer stdlib; add external deps only with justification in PR description

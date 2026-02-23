@@ -1,0 +1,24 @@
+# Model registry: maps model names to ONNX file paths and metadata.
+# The engine hot-loads models from this registry on startup and on file change.
+
+models:
+  - name: payment_fraud_xgb
+    path: configs/models/payment_fraud_xgb.onnx
+    inputFeatures:
+      - device.linked_account_count_7d
+      - user.register_days
+      - velocity.pay_count_1hour
+      - ip.risk_score
+      - device.risk_score
+    outputKey: fraud_probability   # name of the ONNX output tensor
+    champion: true
+
+  - name: device_risk_lr
+    path: configs/models/device_risk_lr.onnx
+    inputFeatures:
+      - device.is_simulator
+      - device.is_rooted
+      - device.is_vpn
+      - device.linked_account_count_7d
+    outputKey: device_risk_score
+    champion: true

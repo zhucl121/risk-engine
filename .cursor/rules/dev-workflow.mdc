@@ -1,0 +1,68 @@
+---
+description: Spec-driven development guardrails for riskengine. Enforces the OpenSpec+Superpowers workflow. Always applied to all sessions.
+alwaysApply: true
+---
+
+# Dev Workflow Guardrails
+
+## Hard Gates — Never Cross These
+
+| Situation | Rule |
+|-----------|------|
+| Non-trivial feature request | STOP. Ask: "Does `openspec/changes/<name>/proposal.md` exist?" If no → create it first |
+| Touching any interface in `engine/` `rule/` `feature/` `model/` `list/` | STOP. Require `design.md` with Architect REVIEW section before writing code |
+| Writing implementation code | STOP. Verify `tasks.md` has an unchecked `[ ]` task that covers this code |
+| Completing a task | Mark `[x]` in `tasks.md` BEFORE moving to the next |
+
+## Role Switching
+
+The agent switches roles based on the active command:
+
+| Command | Active Role | Allowed output |
+|---------|------------|----------------|
+| `/opsx:new` | Planner | Create folder scaffold + empty files only |
+| `/opsx:ff` | Planner | proposal.md + requirements.md + design.md + tasks.md |
+| `/opsx:review` | Architect | Append REVIEW section to design.md — NO code |
+| `/opsx:apply` | Implementor | Go code for ONE task only + mark `[x]` |
+| `/opsx:archive` | Archivist | Shell mv command + CHANGELOG entry + spec merges |
+
+**Role isolation is strict**: an Architect outputs NO code. An Implementor outputs NO design changes.
+
+## Git Commit Discipline
+
+**Rule**: Every time a complete functional module is implemented, commit immediately before starting the next task.
+
+| Trigger | Action |
+|---------|--------|
+| A complete pkg (e.g. `pkg/dsl/`) builds and tests pass | `git add` relevant files → `git commit` |
+| A complete internal layer (e.g. DB storage, loader, watcher) is done | `git commit` before moving to next layer |
+| A complete API group is done | `git commit` |
+| All tests for a module pass | `git commit` the tests together with the module |
+
+**Commit message format**: `feat(<scope>): <what and why in one line>`
+
+Examples:
+- `feat(dsl): add ANTLR4-based RiskDSL compiler with builtin risk functions`
+- `feat(rule): add DB-backed rule repository and DBLoader`
+- `feat(api): add admin rule management REST API`
+- `test(dsl): add compiler unit tests and benchmarks`
+
+**Never** batch multiple unrelated modules into a single commit.
+
+## Scope Creep Prevention
+
+If implementation reveals work not in `tasks.md`:
+1. STOP implementation
+2. Add new tasks to `tasks.md` (bottom of the list)
+3. Resume from the original task
+
+Never silently expand scope.
+
+## Spec Compliance (enforced by Reviewer role)
+
+After `/opsx:apply` completes all tasks, verify:
+- All new feature keys are defined in `internal/feature/keys.go`
+- All new interfaces are listed in `openspec/specs/<component>.md`
+- `CHANGELOG.md` is updated under `[Unreleased]`
+
+> Full workflow guide, templates, and patterns → read skill `riskengine-workflow`
