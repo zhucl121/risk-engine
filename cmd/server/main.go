@@ -108,6 +108,7 @@ func main() {
 	router.Use(
 		mw.RequestID(),
 		mw.Metrics(),
+		mw.RateLimit(mw.DefaultRateLimitConfig()),
 		mw.Logger(logger),
 		mw.Recovery(logger),
 		mw.Tracing(),
