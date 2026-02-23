@@ -15,6 +15,7 @@ import (
 	"github.com/yourorg/riskengine/internal/feature"
 	"github.com/yourorg/riskengine/internal/list"
 	"github.com/yourorg/riskengine/internal/model"
+	"github.com/yourorg/riskengine/internal/resilience"
 	"github.com/yourorg/riskengine/internal/rule"
 )
 
@@ -24,6 +25,9 @@ type Deps struct {
 	Rules    rule.Evaluator
 	Models   model.Registry
 	List     list.Service
+	// Breakers maps step-name → Breaker. Nil entries are treated as no breaker.
+	// Keys: "list", "model" (matches StepKindList / StepKindModel lower-case).
+	Breakers map[string]*resilience.Breaker
 }
 
 // pipeline is the concrete Pipeline implementation.
@@ -198,16 +202,30 @@ func (p *pipeline) dispatchModel(
 ) (*StepResult, error) {
 	sr.Models = make(map[string]float64, len(step.Models))
 	maxScore := 0.0
-	for _, name := range step.Models {
-		score, err := p.deps.Models.Score(ctx, name, features)
-		if err != nil {
-			// Model inference failure is treated as a step error.
-			return nil, err
+
+	var callErr error
+	innerFn := func(ctx context.Context) error {
+		for _, name := range step.Models {
+			score, err := p.deps.Models.Score(ctx, name, features)
+			if err != nil {
+				return err
+			}
+			sr.Models[name] = score
+			if score > maxScore {
+				maxScore = score
+			}
 		}
-		sr.Models[name] = score
-		if score > maxScore {
-			maxScore = score
-		}
+		return nil
+	}
+
+	if b := p.deps.Breakers["model"]; b != nil {
+		callErr = b.Execute(ctx, innerFn)
+	} else {
+		callErr = innerFn(ctx)
+	}
+
+	if callErr != nil {
+		return nil, callErr
 	}
 	sr.Score = int(maxScore * 1000)
 	sr.Decision = engine.DecisionPass
@@ -224,27 +242,42 @@ func (p *pipeline) dispatchList(
 		{Kind: "device", Value: req.DeviceID},
 		{Kind: "ip", Value: req.IP},
 	}
-	for _, q := range queries {
-		if q.Value == "" {
-			continue
-		}
-		status, err := p.deps.List.Check(ctx, q)
-		if err != nil {
-			return nil, err
-		}
-		switch status {
-		case list.StatusBlacklist:
-			sr.Decision = engine.DecisionReject
-			sr.Score = 1000
-			sr.Reasons = append(sr.Reasons, fmt.Sprintf("blacklist:%s:%s", q.Kind, q.Value))
-			return sr, nil
-		case list.StatusGraylist:
-			if decisionPriority(engine.DecisionManualReview) > decisionPriority(sr.Decision) {
-				sr.Decision = engine.DecisionManualReview
-				sr.Score = 700
+
+	innerFn := func(ctx context.Context) error {
+		for _, q := range queries {
+			if q.Value == "" {
+				continue
+			}
+			s, err := p.deps.List.Check(ctx, q)
+			if err != nil {
+				return err
+			}
+			switch s {
+			case list.StatusBlacklist:
+				sr.Decision = engine.DecisionReject
+				sr.Score = 1000
+				sr.Reasons = append(sr.Reasons, fmt.Sprintf("blacklist:%s:%s", q.Kind, q.Value))
+				return nil
+			case list.StatusGraylist:
+				if decisionPriority(engine.DecisionManualReview) > decisionPriority(sr.Decision) {
+					sr.Decision = engine.DecisionManualReview
+					sr.Score = 700
+				}
 			}
 		}
+		return nil
 	}
+
+	var callErr error
+	if b := p.deps.Breakers["list"]; b != nil {
+		callErr = b.Execute(ctx, innerFn)
+	} else {
+		callErr = innerFn(ctx)
+	}
+	if callErr != nil {
+		return nil, callErr
+	}
+
 	if sr.Decision == "" {
 		sr.Decision = engine.DecisionPass
 	}

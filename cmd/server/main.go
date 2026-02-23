@@ -37,6 +37,7 @@ import (
 	"github.com/yourorg/riskengine/internal/health"
 	"github.com/yourorg/riskengine/internal/model"
 	"github.com/yourorg/riskengine/internal/orchestrator"
+	"github.com/yourorg/riskengine/internal/resilience"
 	"github.com/yourorg/riskengine/pkg/dsl"
 	"github.com/yourorg/riskengine/pkg/dsl/builtins"
 	"github.com/yourorg/riskengine/pkg/sliding"
@@ -82,11 +83,16 @@ func main() {
 	// Register ML scorers here: modelReg.Register("fraud_v1", onnx.NewScorer(...))
 
 	// ── Orchestrator registry ─────────────────────────────────────────────────
+	breakerCfg := resilience.DefaultBreakerConfig()
 	deps := orchestrator.Deps{
 		Features: featureSvc,
 		Rules:    newNoopRuleEvaluator(),
 		Models:   modelReg,
 		List:     listSvc,
+		Breakers: map[string]*resilience.Breaker{
+			"list":  resilience.New("list", breakerCfg),
+			"model": resilience.New("model", breakerCfg),
+		},
 	}
 	orchReg := orchestrator.NewRegistry(deps)
 	// Load policy sets from YAML files. Silently skip if directory is missing

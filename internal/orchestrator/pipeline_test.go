@@ -70,6 +70,7 @@ func newDeps(
 		Rules:    &stubRuleEvaluator{results: ruleResults},
 		Models:   &stubModelRegistry{score: modelScore},
 		List:     &stubListService{statuses: listStatuses},
+		Breakers: nil, // no breakers in tests
 	}
 }
 
@@ -150,6 +151,7 @@ func TestPipeline_SceneNotFound(t *testing.T) {
 		Rules:    &stubRuleEvaluator{},
 		Models:   &stubModelRegistry{},
 		List:     &stubListService{statuses: map[string]list.Status{}},
+		Breakers: nil,
 	})
 	_, err := reg.Get("missing_scene")
 	require.Error(t, err)
