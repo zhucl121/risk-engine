@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/yourorg/riskengine/internal/audit"
 	"github.com/yourorg/riskengine/internal/engine"
 	"github.com/yourorg/riskengine/internal/feature"
 	"github.com/yourorg/riskengine/internal/list"
@@ -18,6 +19,7 @@ import (
 	"github.com/yourorg/riskengine/internal/resilience"
 	"github.com/yourorg/riskengine/internal/rule"
 	"github.com/yourorg/riskengine/internal/scene"
+	"github.com/yourorg/riskengine/pkg/dsl"
 )
 
 // Deps bundles all service dependencies the pipeline dispatches to.
@@ -34,6 +36,18 @@ type Deps struct {
 	// fields from the database.  When nil, only the static PolicySet.ExtraSchema
 	// is used.
 	ExtraParamLoader *scene.ExtraParamLoader
+
+	// DSLRegistry is used to compile and evaluate Step.Condition expressions.
+	// When nil, all Condition checks are skipped (step always runs).
+	DSLRegistry *dsl.FunctionRegistry
+
+	// ShadowAuditWriter receives shadow (dry-run) execution records.
+	// When nil, shadow results are silently discarded.
+	ShadowAuditWriter *audit.ChannelWriter
+
+	// Registry is used by shadow mode to look up shadow policy pipelines.
+	// This back-reference is set by atomicRegistry after construction.
+	Registry Registry
 }
 
 // pipeline is the concrete Pipeline implementation.
@@ -138,17 +152,93 @@ func (p *pipeline) Execute(ctx context.Context, req *engine.DecisionRequest) (*e
 
 	res.RiskLevel = scoreToLevel(res.RiskScore)
 	res.CostMs = time.Since(start).Milliseconds()
+
+	// ── Shadow (dry-run) policies ─────────────────────────────────────────────
+	// Run shadow pipelines asynchronously after the real decision is finalized.
+	// They NEVER block or modify the returned result.
+	if len(p.policy.ShadowPolicies) > 0 &&
+		p.deps.Registry != nil &&
+		p.deps.ShadowAuditWriter != nil {
+		go p.runShadowPolicies(req, features, res)
+	}
+
 	return res, nil
 }
 
-// runStep executes a single step with its configured timeout.
-// Returns nil on SKIP (error swallowed) or when the step produces no result.
+// runShadowPolicies executes each shadow policy concurrently in the background.
+// It uses a detached context (background) so main request cancellation does not
+// abort shadow execution; shadow runs are best-effort.
+func (p *pipeline) runShadowPolicies(
+	req *engine.DecisionRequest,
+	features feature.Map,
+	prodResult *engine.DecisionResult,
+) {
+	ctx := context.Background()
+	for _, ref := range p.policy.ShadowPolicies {
+		ref := ref // capture
+		go func() {
+			shadowPipeline, err := p.deps.Registry.Get(ref.SceneCode)
+			if err != nil {
+				return
+			}
+			shadowStart := time.Now()
+			shadowRes, err := shadowPipeline.Execute(ctx, req)
+			costMs := time.Since(shadowStart).Milliseconds()
+			if err != nil || shadowRes == nil {
+				return
+			}
+			rec := audit.NewShadowRecord(
+				req.RequestID,
+				p.policy.SceneCode,
+				ref.SceneCode,
+				ref.Version,
+				req.UserID,
+				req.DeviceID,
+				string(shadowRes.Decision),
+				shadowRes.RiskScore,
+				string(prodResult.Decision),
+				prodResult.RiskScore,
+				shadowRes.HitRules,
+				shadowRes.ModelScores,
+				shadowRes.RiskReasons,
+				costMs,
+			)
+			p.deps.ShadowAuditWriter.WriteShadow(rec)
+		}()
+	}
+}
+
+// runStep executes a single step with its configured timeout, optional
+// Condition check, and automatic retry.
+// Returns a skipped StepResult (not an error) when:
+//   - the Condition evaluates to false
+//   - dispatch fails and OnFailure == SKIP
 func (p *pipeline) runStep(
 	ctx context.Context,
 	step Step,
 	req *engine.DecisionRequest,
 	features feature.Map,
 ) (*StepResult, error) {
+	// ── Step Condition ───────────────────────────────────────────────────────
+	if step.Condition != "" && p.deps.DSLRegistry != nil {
+		prog, compileErr := dsl.Compile(step.Condition, p.deps.DSLRegistry)
+		if compileErr == nil {
+			rt := dsl.AcquireRuntime()
+			rt.Request = req
+			rt.Features = features
+			condResult, runErr := prog.Run(ctx, rt)
+			dsl.ReleaseRuntime(rt)
+			if runErr == nil && !condResult {
+				return &StepResult{
+					Step:     step,
+					Skipped:  true,
+					Decision: engine.DecisionPass,
+				}, nil
+			}
+		}
+		// On compile/run error, continue executing the step (fail-open).
+	}
+
 	sCtx := ctx
 	var cancel context.CancelFunc
 	if step.Timeout > 0 {
@@ -156,12 +246,31 @@ func (p *pipeline) runStep(
 		defer cancel()
 	}
 
-	sr, err := p.dispatch(sCtx, step, req, features)
-	if err != nil {
-		return p.handleStepError(err, step), nil
+	// ── Retry ────────────────────────────────────────────────────────────────
+	maxAttempts := step.Retry.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = 1
 	}
-	return sr, nil
+	delay := time.Duration(step.Retry.DelayMs) * time.Millisecond
+
+	var sr *StepResult
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 && delay > 0 {
+			select {
+			case <-ctx.Done():
+				return p.handleStepError(ctx.Err(), step), nil
+			case <-time.After(delay):
+			}
+		}
+		sr, lastErr = p.dispatch(sCtx, step, req, features)
+		if lastErr == nil {
+			return sr, nil
+		}
+	}
+	return p.handleStepError(lastErr, step), nil
 }
+
 
 // dispatch routes a step to the appropriate service.
 // If the step has a ParamMapping, the resolved params are merged on top of
@@ -358,9 +467,19 @@ func (p *pipeline) handleStepError(err error, step Step) *StepResult {
 	return sr
 }
 
-// apply merges a StepResult into the accumulating DecisionResult.
-// Returns true if the pipeline should terminate early.
+// apply merges a StepResult into the accumulating DecisionResult using the
+// pipeline-level aggregation strategy.
+// Returns true if the pipeline should terminate early (short-circuit).
 func (p *pipeline) apply(res *engine.DecisionResult, sr *StepResult, step Step) bool {
+	return p.applyWithStrategy(res, sr, step, p.policy.Strategy)
+}
+
+func (p *pipeline) applyWithStrategy(
+	res *engine.DecisionResult,
+	sr *StepResult,
+	step Step,
+	strategy AggregationStrategy,
+) bool {
 	trace := engine.StepTrace{
 		Name:    step.Name,
 		CostMs:  sr.CostMs,
@@ -384,11 +503,56 @@ func (p *pipeline) apply(res *engine.DecisionResult, sr *StepResult, step Step) 
 	for k, v := range sr.Models {
 		res.ModelScores[k] = v
 	}
-	if sr.Score > res.RiskScore {
-		res.RiskScore = sr.Score
-	}
-	if decisionPriority(sr.Decision) > decisionPriority(res.Decision) {
-		res.Decision = sr.Decision
+
+	switch strategy {
+	case AggregationRuleFirst:
+		// Rule steps take priority; model scores are only used when no rule hit.
+		if step.Kind == StepKindRule && sr.Decision != engine.DecisionPass {
+			res.RiskScore = sr.Score
+			res.Decision = sr.Decision
+			return sr.Decision == engine.DecisionReject
+		}
+		// Model step: only update if no rule has produced a decision yet.
+		if step.Kind == StepKindModel && res.Decision == engine.DecisionPass {
+			if sr.Score > res.RiskScore {
+				res.RiskScore = sr.Score
+			}
+		}
+
+	case AggregationWeighted:
+		// Weighted: accumulate a weighted sum of scores; decision is derived from the sum.
+		weight := step.Weight
+		if weight <= 0 {
+			weight = 1.0
+		}
+		// Store raw weighted score; final normalisation happens in Execute after all steps.
+		weightedScore := int(float64(sr.Score) * weight)
+		res.RiskScore += weightedScore
+		// Clamp to 1000.
+		if res.RiskScore > 1000 {
+			res.RiskScore = 1000
+		}
+		// Decision: derive from accumulated score.
+		var derived engine.Decision
+		switch {
+		case res.RiskScore >= 800:
+			derived = engine.DecisionReject
+		case res.RiskScore >= 500:
+			derived = engine.DecisionManualReview
+		default:
+			derived = engine.DecisionPass
+		}
+		if decisionPriority(derived) > decisionPriority(res.Decision) {
+			res.Decision = derived
+		}
+
+	default: // HIGHEST_RISK (default)
+		if sr.Score > res.RiskScore {
+			res.RiskScore = sr.Score
+		}
+		if decisionPriority(sr.Decision) > decisionPriority(res.Decision) {
+			res.Decision = sr.Decision
+		}
 	}
 
 	// Short-circuit on REJECT from a non-SKIP policy.

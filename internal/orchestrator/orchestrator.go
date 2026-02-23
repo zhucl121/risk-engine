@@ -42,20 +42,42 @@ const (
 	AggregationRuleFirst   AggregationStrategy = "RULE_FIRST"
 )
 
+// RetryConfig controls automatic retry behaviour for a step.
+type RetryConfig struct {
+	// MaxAttempts is the maximum number of total attempts (1 = no retry).
+	MaxAttempts int
+	// DelayMs is the fixed delay between attempts in milliseconds.
+	DelayMs int
+}
+
 // Step is one node in the execution DAG.
 type Step struct {
-	Name      string
-	Kind      StepKind
+	Name string
+	Kind StepKind
 	// RuleGroup is the rule group name for StepKindRule steps.
 	RuleGroup string
 	// Models lists model names for StepKindModel steps.
-	Models    []string
-	Timeout   time.Duration
+	Models  []string
+	Timeout time.Duration
 	// Parallel marks this step to run concurrently with its siblings.
-	Parallel  bool
+	Parallel bool
 	// OnFailure defines behaviour when this step errors or times out.
 	OnFailure FailurePolicy
 	Strategy  AggregationStrategy // used only for StepKindAggregate
+
+	// Weight is used by the WEIGHTED aggregation strategy.
+	// Steps with higher Weight contribute proportionally more to the final score.
+	// Defaults to 1.0 when zero.
+	Weight float64
+
+	// Condition is an optional DSL expression evaluated before the step runs.
+	// If the expression evaluates to false the step is skipped (treated as SKIP).
+	// Example: "extra.amount > 10000"  — only run this step for large amounts.
+	Condition string
+
+	// Retry configures automatic retry on transient errors.
+	// Zero value means no retry (single attempt).
+	Retry RetryConfig
 
 	// ParamMapping controls how downstream input parameters are populated
 	// for this step.  Keys are the downstream parameter names; values are
@@ -72,6 +94,17 @@ type Step struct {
 	ListQueryFields []string
 }
 
+// ShadowPolicyRef references another PolicySet to run in shadow (dry-run) mode.
+// The shadow pipeline executes concurrently with the real pipeline but its
+// decision is NEVER returned to the caller; results are written to the audit
+// log for offline analysis.
+type ShadowPolicyRef struct {
+	// SceneCode is the scene code of the shadow policy to execute.
+	SceneCode string
+	// Version tags the shadow policy for traceability in audit records.
+	Version string
+}
+
 // PolicySet is the complete configuration for one business scene.
 type PolicySet struct {
 	SceneCode string
@@ -81,6 +114,15 @@ type PolicySet struct {
 	Fallback engine.Decision
 	// ABTest holds optional A/B experiment configuration.
 	ABTest *ABTestConfig
+
+	// Strategy is the pipeline-level aggregation strategy.
+	// Defaults to HIGHEST_RISK when empty.
+	Strategy AggregationStrategy
+
+	// ShadowPolicies lists policies to execute in parallel in shadow/dry-run mode.
+	// Their results do NOT affect the real decision; they are recorded in the audit
+	// log under the "shadow_audit" key for offline comparison and analysis.
+	ShadowPolicies []ShadowPolicyRef
 
 	// ExtraSchema declares the intended type for each key in
 	// DecisionRequest.Extra.  Declared keys are type-coerced before being

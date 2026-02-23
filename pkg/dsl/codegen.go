@@ -35,6 +35,12 @@ func (g *codegenVisitor) generate(node ast.Node) (evalFn, error) {
 		return g.genFieldAccess(n)
 	case *ast.Ident:
 		return g.genIdent(n)
+	case *ast.ArrayLit:
+		return g.genArrayLit(n)
+	case *ast.InExpr:
+		return g.genIn(n)
+	case *ast.TernaryExpr:
+		return g.genTernary(n)
 	case *ast.IntLit:
 		v := IntValue(n.Val)
 		return func(_ context.Context, _ *Runtime) (Value, error) { return v, nil }, nil
@@ -250,6 +256,123 @@ func (g *codegenVisitor) genIdent(n *ast.Ident) (evalFn, error) {
 		Message: fmt.Sprintf("unknown identifier %q — use features['key'] for feature values", name),
 		Line:    line, Col: col,
 	}
+}
+
+// genArrayLit compiles an array literal into a closure that returns an
+// ArrayValue (stored as KindObject with numeric string keys "0","1",...).
+// This avoids adding a new Kind, keeping the Value struct unchanged.
+func (g *codegenVisitor) genArrayLit(n *ast.ArrayLit) (evalFn, error) {
+	elemFns := make([]evalFn, len(n.Elems))
+	for i, e := range n.Elems {
+		ef, err := g.generate(e)
+		if err != nil {
+			return nil, err
+		}
+		elemFns[i] = ef
+	}
+	return func(ctx context.Context, rt *Runtime) (Value, error) {
+		obj := make(Object, len(elemFns))
+		for i, ef := range elemFns {
+			v, err := ef(ctx, rt)
+			if err != nil {
+				return NilValue(), err
+			}
+			obj[fmt.Sprintf("%d", i)] = v
+		}
+		// Store length so InExpr can iterate.
+		obj["__len"] = IntValue(int64(len(elemFns)))
+		return ObjectValue(obj), nil
+	}, nil
+}
+
+// genIn compiles an `in` / `not in` expression.
+// The right-hand side must evaluate to an array object produced by genArrayLit.
+func (g *codegenVisitor) genIn(n *ast.InExpr) (evalFn, error) {
+	valFn, err := g.generate(n.Value)
+	if err != nil {
+		return nil, err
+	}
+	arrFn, err := g.generate(n.Array)
+	if err != nil {
+		return nil, err
+	}
+	negated := n.Negated
+	line, col := n.Line, n.Col
+	return func(ctx context.Context, rt *Runtime) (Value, error) {
+		val, err := valFn(ctx, rt)
+		if err != nil {
+			return NilValue(), err
+		}
+		arrVal, err := arrFn(ctx, rt)
+		if err != nil {
+			return NilValue(), err
+		}
+		if arrVal.Kind() != KindObject {
+			return NilValue(), &TypeError{
+				Message: "right-hand side of 'in' must be an array literal",
+				Line: line, Col: col,
+			}
+		}
+		obj := arrVal.objVal
+		lenVal, ok := obj["__len"]
+		if !ok {
+			return BoolValue(negated), nil // empty
+		}
+		length := int(lenVal.intVal)
+		found := false
+		for i := 0; i < length; i++ {
+			elem, ok2 := obj[fmt.Sprintf("%d", i)]
+			if !ok2 {
+				continue
+			}
+			match, err := compare("==", val, elem, line, col)
+			if err != nil {
+				continue // type mismatch — skip
+			}
+			if match {
+				found = true
+				break
+			}
+		}
+		if negated {
+			return BoolValue(!found), nil
+		}
+		return BoolValue(found), nil
+	}, nil
+}
+
+// genTernary compiles a ternary expression: cond ? then : else.
+// The condition is always evaluated; only one branch is evaluated (lazy).
+func (g *codegenVisitor) genTernary(n *ast.TernaryExpr) (evalFn, error) {
+	condFn, err := g.generate(n.Condition)
+	if err != nil {
+		return nil, err
+	}
+	thenFn, err := g.generate(n.Then)
+	if err != nil {
+		return nil, err
+	}
+	elseFn, err := g.generate(n.Else)
+	if err != nil {
+		return nil, err
+	}
+	line, col := n.Line, n.Col
+	return func(ctx context.Context, rt *Runtime) (Value, error) {
+		cv, err := condFn(ctx, rt)
+		if err != nil {
+			return NilValue(), err
+		}
+		if cv.Kind() != KindBool {
+			return NilValue(), &TypeError{
+				Message: "ternary condition must be bool",
+				Line: line, Col: col,
+			}
+		}
+		if cv.Bool() {
+			return thenFn(ctx, rt)
+		}
+		return elseFn(ctx, rt)
+	}, nil
 }
 
 // ─── Comparison helpers ───────────────────────────────────────────────────────

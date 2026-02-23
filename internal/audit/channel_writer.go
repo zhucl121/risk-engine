@@ -13,6 +13,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// shadowChan is the separate buffer for shadow records to keep them isolated
+// from the main audit channel.
+type shadowChan = chan *ShadowRecord
+
 const defaultBufferSize = 4096
 
 // ChannelWriter is a non-blocking audit Writer that enqueues records into a
@@ -22,16 +26,17 @@ const defaultBufferSize = 4096
 // JSON and emit a structured log entry so the system is self-contained.
 //
 // Design guarantees:
-//   - Write() never blocks the caller; full channel → record dropped + counter
+//   - Write() / WriteShadow() never block the caller; full channel → drop + counter
 //   - Flush() blocks until the channel is drained or ctx is cancelled
 //   - Close() signals the consumer to stop; calling Write after Close is a no-op
 type ChannelWriter struct {
-	ch       chan *Record
-	logger   *zap.Logger
-	wg       sync.WaitGroup
-	dropped  atomic.Int64
-	once     sync.Once // guards Close
-	closed   atomic.Bool
+	ch         chan *Record
+	shadowCh   shadowChan
+	logger     *zap.Logger
+	wg         sync.WaitGroup
+	dropped    atomic.Int64
+	once       sync.Once // guards Close
+	closed     atomic.Bool
 }
 
 // NewChannelWriter creates a ChannelWriter and starts the background consumer.
@@ -41,11 +46,13 @@ func NewChannelWriter(logger *zap.Logger, bufferSize int) *ChannelWriter {
 		bufferSize = defaultBufferSize
 	}
 	w := &ChannelWriter{
-		ch:     make(chan *Record, bufferSize),
-		logger: logger,
+		ch:       make(chan *Record, bufferSize),
+		shadowCh: make(shadowChan, bufferSize),
+		logger:   logger,
 	}
-	w.wg.Add(1)
+	w.wg.Add(2)
 	go w.consume()
+	go w.consumeShadow()
 	return w
 }
 
@@ -90,12 +97,29 @@ func (w *ChannelWriter) Flush(ctx context.Context) error {
 	}
 }
 
+// WriteShadow enqueues a shadow record for asynchronous delivery.
+func (w *ChannelWriter) WriteShadow(r *ShadowRecord) {
+	if w.closed.Load() {
+		return
+	}
+	select {
+	case w.shadowCh <- r:
+	default:
+		n := w.dropped.Add(1)
+		w.logger.Warn("shadow audit channel full, record dropped",
+			zap.Int64("total_dropped", n),
+			zap.String("request_id", r.RequestID),
+		)
+	}
+}
+
 // Close signals the background consumer to stop after draining the channel.
 // It blocks until the consumer goroutine exits.
 func (w *ChannelWriter) Close() error {
 	w.once.Do(func() {
 		w.closed.Store(true)
 		close(w.ch)
+		close(w.shadowCh)
 	})
 	w.wg.Wait()
 	return nil
@@ -111,6 +135,14 @@ func (w *ChannelWriter) consume() {
 	defer w.wg.Done()
 	for r := range w.ch {
 		w.emit(r)
+	}
+}
+
+// consumeShadow drains the shadow channel.
+func (w *ChannelWriter) consumeShadow() {
+	defer w.wg.Done()
+	for r := range w.shadowCh {
+		w.emitShadow(r)
 	}
 }
 
@@ -130,6 +162,30 @@ func (w *ChannelWriter) emit(r *Record) {
 		zap.String("scene_code", r.SceneCode),
 		zap.String("decision", string(r.Decision)),
 		zap.Int("risk_score", r.RiskScore),
+		zap.Int64("cost_ms", r.CostMs),
+		zap.ByteString("payload", b),
+	)
+}
+
+// emitShadow serialises a shadow record and writes it under the "shadow_audit" key.
+func (w *ChannelWriter) emitShadow(r *ShadowRecord) {
+	b, err := json.Marshal(r)
+	if err != nil {
+		w.logger.Error("shadow_audit: marshal failed",
+			zap.String("request_id", r.RequestID),
+			zap.Error(err),
+		)
+		return
+	}
+	w.logger.Info("shadow_audit",
+		zap.String("request_id", r.RequestID),
+		zap.String("scene_code", r.SceneCode),
+		zap.String("shadow_scene_code", r.ShadowSceneCode),
+		zap.String("shadow_version", r.ShadowVersion),
+		zap.String("shadow_decision", r.Decision),
+		zap.String("prod_decision", r.ProductionDecision),
+		zap.Int("shadow_score", r.RiskScore),
+		zap.Int("prod_score", r.ProductionScore),
 		zap.Int64("cost_ms", r.CostMs),
 		zap.ByteString("payload", b),
 	)

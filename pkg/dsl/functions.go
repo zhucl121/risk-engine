@@ -67,3 +67,19 @@ func (r *FunctionRegistry) Lookup(name string) (FuncDef, bool) {
 	fn, ok := r.funcs[name]
 	return fn, ok
 }
+
+// FuncImpl is the Go implementation type for a DSL function.
+// It is a convenience alias for the Impl field of FuncDef.
+type FuncImpl = func(ctx context.Context, rt *Runtime, args []Value) (Value, error)
+
+// RegisterFunc registers a function by name with any-typed arguments and any return kind.
+// This is a convenience wrapper around Register for functions that do not need
+// static argument-type checking.
+func (r *FunctionRegistry) RegisterFunc(name string, impl FuncImpl) error {
+	return r.Register(FuncDef{
+		Name:       name,
+		Args:       nil, // no static type check
+		ReturnKind: KindNil, // unknown at compile time
+		Impl:       impl,
+	})
+}

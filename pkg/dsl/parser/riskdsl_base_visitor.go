@@ -1,4 +1,4 @@
-// Code generated from grammar/RiskDSL.g4 by ANTLR 4.13.2. DO NOT EDIT.
+// Code generated from RiskDSL.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser // RiskDSL
 import "github.com/antlr4-go/antlr/v4"
@@ -15,15 +15,35 @@ func (v *BaseRiskDSLVisitor) VisitBinaryCompare(ctx *BinaryCompareContext) inter
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseRiskDSLVisitor) VisitIdentExpr(ctx *IdentExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseRiskDSLVisitor) VisitIn(ctx *InContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseRiskDSLVisitor) VisitTernary(ctx *TernaryContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseRiskDSLVisitor) VisitNotIn(ctx *NotInContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseRiskDSLVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseRiskDSLVisitor) VisitBinaryLogical(ctx *BinaryLogicalContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseRiskDSLVisitor) VisitFuncCall(ctx *FuncCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseRiskDSLVisitor) VisitUnaryNot(ctx *UnaryNotContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseRiskDSLVisitor) VisitIdentExpr(ctx *IdentExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -36,10 +56,6 @@ func (v *BaseRiskDSLVisitor) VisitMapIndex(ctx *MapIndexContext) interface{} {
 }
 
 func (v *BaseRiskDSLVisitor) VisitFieldAccess(ctx *FieldAccessContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseRiskDSLVisitor) VisitBinaryLogical(ctx *BinaryLogicalContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -64,5 +80,9 @@ func (v *BaseRiskDSLVisitor) VisitStringLiteral(ctx *StringLiteralContext) inter
 }
 
 func (v *BaseRiskDSLVisitor) VisitBoolLiteral(ctx *BoolLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseRiskDSLVisitor) VisitNullLiteral(ctx *NullLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }

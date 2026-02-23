@@ -1,4 +1,4 @@
-// Code generated from grammar/RiskDSL.g4 by ANTLR 4.13.2. DO NOT EDIT.
+// Code generated from RiskDSL.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser // RiskDSL
 import (
@@ -32,47 +32,58 @@ var RiskDSLParserStaticData struct {
 func riskdslParserInit() {
 	staticData := &RiskDSLParserStaticData
 	staticData.LiteralNames = []string{
-		"", "", "", "", "", "", "'&&'", "'||'", "'!'", "'>'", "'<'", "'>='",
-		"'<='", "'=='", "'!='", "'('", "')'", "'['", "']'", "'.'", "','",
+		"", "", "", "'in'", "'not'", "", "", "", "", "'&&'", "'||'", "'!'",
+		"'>'", "'<'", "'>='", "'<='", "'=='", "'!='", "'?'", "':'", "'('", "')'",
+		"'['", "']'", "'.'", "','",
 	}
 	staticData.SymbolicNames = []string{
-		"", "BOOL_LIT", "INT_LIT", "FLOAT_LIT", "STRING", "ID", "AND", "OR",
-		"NOT", "GT", "LT", "GTE", "LTE", "EQ", "NEQ", "LPAREN", "RPAREN", "LBRACK",
-		"RBRACK", "DOT", "COMMA", "WS",
+		"", "BOOL_LIT", "NULL_LIT", "IN", "NOT_KW", "INT_LIT", "FLOAT_LIT",
+		"STRING", "ID", "AND", "OR", "NOT", "GT", "LT", "GTE", "LTE", "EQ",
+		"NEQ", "QMARK", "COLON", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "DOT",
+		"COMMA", "WS",
 	}
 	staticData.RuleNames = []string{
 		"condition", "expr", "argList", "literal",
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 21, 65, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 1, 0, 1,
+		4, 1, 26, 84, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 1, 0, 1,
 		0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 18, 8, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 28, 8, 1, 11, 1, 12, 1, 29, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 38, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 5, 1, 46, 8, 1, 10, 1, 12, 1, 49, 9, 1, 1, 2, 1, 2, 1, 2, 5,
-		2, 54, 8, 2, 10, 2, 12, 2, 57, 9, 2, 1, 3, 1, 3, 1, 3, 1, 3, 3, 3, 63,
-		8, 3, 1, 3, 0, 1, 2, 4, 0, 2, 4, 6, 0, 2, 1, 0, 9, 14, 1, 0, 6, 7, 74,
-		0, 8, 1, 0, 0, 0, 2, 37, 1, 0, 0, 0, 4, 50, 1, 0, 0, 0, 6, 62, 1, 0, 0,
-		0, 8, 9, 3, 2, 1, 0, 9, 10, 5, 0, 0, 1, 10, 1, 1, 0, 0, 0, 11, 12, 6, 1,
-		-1, 0, 12, 13, 5, 8, 0, 0, 13, 38, 3, 2, 1, 9, 14, 15, 5, 5, 0, 0, 15,
-		17, 5, 15, 0, 0, 16, 18, 3, 4, 2, 0, 17, 16, 1, 0, 0, 0, 17, 18, 1, 0,
-		0, 0, 18, 19, 1, 0, 0, 0, 19, 38, 5, 16, 0, 0, 20, 21, 5, 5, 0, 0, 21,
-		22, 5, 17, 0, 0, 22, 23, 5, 4, 0, 0, 23, 38, 5, 18, 0, 0, 24, 27, 5, 5,
-		0, 0, 25, 26, 5, 19, 0, 0, 26, 28, 5, 5, 0, 0, 27, 25, 1, 0, 0, 0, 28,
-		29, 1, 0, 0, 0, 29, 27, 1, 0, 0, 0, 29, 30, 1, 0, 0, 0, 30, 38, 1, 0, 0,
-		0, 31, 32, 5, 15, 0, 0, 32, 33, 3, 2, 1, 0, 33, 34, 5, 16, 0, 0, 34, 38,
-		1, 0, 0, 0, 35, 38, 3, 6, 3, 0, 36, 38, 5, 5, 0, 0, 37, 11, 1, 0, 0, 0,
-		37, 14, 1, 0, 0, 0, 37, 20, 1, 0, 0, 0, 37, 24, 1, 0, 0, 0, 37, 31, 1,
-		0, 0, 0, 37, 35, 1, 0, 0, 0, 37, 36, 1, 0, 0, 0, 38, 47, 1, 0, 0, 0, 39,
-		40, 10, 8, 0, 0, 40, 41, 7, 0, 0, 0, 41, 46, 3, 2, 1, 9, 42, 43, 10, 7,
-		0, 0, 43, 44, 7, 1, 0, 0, 44, 46, 3, 2, 1, 8, 45, 39, 1, 0, 0, 0, 45, 42,
-		1, 0, 0, 0, 46, 49, 1, 0, 0, 0, 47, 45, 1, 0, 0, 0, 47, 48, 1, 0, 0, 0,
-		48, 3, 1, 0, 0, 0, 49, 47, 1, 0, 0, 0, 50, 55, 3, 2, 1, 0, 51, 52, 5, 20,
-		0, 0, 52, 54, 3, 2, 1, 0, 53, 51, 1, 0, 0, 0, 54, 57, 1, 0, 0, 0, 55, 53,
-		1, 0, 0, 0, 55, 56, 1, 0, 0, 0, 56, 5, 1, 0, 0, 0, 57, 55, 1, 0, 0, 0,
-		58, 63, 5, 2, 0, 0, 59, 63, 5, 3, 0, 0, 60, 63, 5, 4, 0, 0, 61, 63, 5,
-		1, 0, 0, 62, 58, 1, 0, 0, 0, 62, 59, 1, 0, 0, 0, 62, 60, 1, 0, 0, 0, 62,
-		61, 1, 0, 0, 0, 63, 7, 1, 0, 0, 0, 7, 17, 29, 37, 45, 47, 55, 62,
+		1, 1, 1, 3, 1, 34, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1,
+		43, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 1, 64, 8, 1, 10,
+		1, 12, 1, 67, 9, 1, 1, 2, 1, 2, 1, 2, 5, 2, 72, 8, 2, 10, 2, 12, 2, 75,
+		9, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 3, 3, 82, 8, 3, 1, 3, 0, 1, 2, 4, 0,
+		2, 4, 6, 0, 2, 1, 0, 12, 17, 1, 0, 9, 10, 99, 0, 8, 1, 0, 0, 0, 2, 42,
+		1, 0, 0, 0, 4, 68, 1, 0, 0, 0, 6, 81, 1, 0, 0, 0, 8, 9, 3, 2, 1, 0, 9,
+		10, 5, 0, 0, 1, 10, 1, 1, 0, 0, 0, 11, 12, 6, 1, -1, 0, 12, 13, 5, 11,
+		0, 0, 13, 43, 3, 2, 1, 13, 14, 15, 5, 8, 0, 0, 15, 17, 5, 20, 0, 0, 16,
+		18, 3, 4, 2, 0, 17, 16, 1, 0, 0, 0, 17, 18, 1, 0, 0, 0, 18, 19, 1, 0, 0,
+		0, 19, 43, 5, 21, 0, 0, 20, 21, 5, 8, 0, 0, 21, 22, 5, 22, 0, 0, 22, 23,
+		5, 7, 0, 0, 23, 43, 5, 23, 0, 0, 24, 27, 5, 8, 0, 0, 25, 26, 5, 24, 0,
+		0, 26, 28, 5, 8, 0, 0, 27, 25, 1, 0, 0, 0, 28, 29, 1, 0, 0, 0, 29, 27,
+		1, 0, 0, 0, 29, 30, 1, 0, 0, 0, 30, 43, 1, 0, 0, 0, 31, 33, 5, 22, 0, 0,
+		32, 34, 3, 4, 2, 0, 33, 32, 1, 0, 0, 0, 33, 34, 1, 0, 0, 0, 34, 35, 1,
+		0, 0, 0, 35, 43, 5, 23, 0, 0, 36, 37, 5, 20, 0, 0, 37, 38, 3, 2, 1, 0,
+		38, 39, 5, 21, 0, 0, 39, 43, 1, 0, 0, 0, 40, 43, 3, 6, 3, 0, 41, 43, 5,
+		8, 0, 0, 42, 11, 1, 0, 0, 0, 42, 14, 1, 0, 0, 0, 42, 20, 1, 0, 0, 0, 42,
+		24, 1, 0, 0, 0, 42, 31, 1, 0, 0, 0, 42, 36, 1, 0, 0, 0, 42, 40, 1, 0, 0,
+		0, 42, 41, 1, 0, 0, 0, 43, 65, 1, 0, 0, 0, 44, 45, 10, 12, 0, 0, 45, 46,
+		7, 0, 0, 0, 46, 64, 3, 2, 1, 13, 47, 48, 10, 11, 0, 0, 48, 49, 5, 4, 0,
+		0, 49, 50, 5, 3, 0, 0, 50, 64, 3, 2, 1, 12, 51, 52, 10, 10, 0, 0, 52, 53,
+		5, 3, 0, 0, 53, 64, 3, 2, 1, 11, 54, 55, 10, 9, 0, 0, 55, 56, 7, 1, 0,
+		0, 56, 64, 3, 2, 1, 10, 57, 58, 10, 8, 0, 0, 58, 59, 5, 18, 0, 0, 59, 60,
+		3, 2, 1, 0, 60, 61, 5, 19, 0, 0, 61, 62, 3, 2, 1, 9, 62, 64, 1, 0, 0, 0,
+		63, 44, 1, 0, 0, 0, 63, 47, 1, 0, 0, 0, 63, 51, 1, 0, 0, 0, 63, 54, 1,
+		0, 0, 0, 63, 57, 1, 0, 0, 0, 64, 67, 1, 0, 0, 0, 65, 63, 1, 0, 0, 0, 65,
+		66, 1, 0, 0, 0, 66, 3, 1, 0, 0, 0, 67, 65, 1, 0, 0, 0, 68, 73, 3, 2, 1,
+		0, 69, 70, 5, 25, 0, 0, 70, 72, 3, 2, 1, 0, 71, 69, 1, 0, 0, 0, 72, 75,
+		1, 0, 0, 0, 73, 71, 1, 0, 0, 0, 73, 74, 1, 0, 0, 0, 74, 5, 1, 0, 0, 0,
+		75, 73, 1, 0, 0, 0, 76, 82, 5, 5, 0, 0, 77, 82, 5, 6, 0, 0, 78, 82, 5,
+		7, 0, 0, 79, 82, 5, 1, 0, 0, 80, 82, 5, 2, 0, 0, 81, 76, 1, 0, 0, 0, 81,
+		77, 1, 0, 0, 0, 81, 78, 1, 0, 0, 0, 81, 79, 1, 0, 0, 0, 81, 80, 1, 0, 0,
+		0, 82, 7, 1, 0, 0, 0, 8, 17, 29, 33, 42, 63, 65, 73, 81,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -112,26 +123,31 @@ func NewRiskDSLParser(input antlr.TokenStream) *RiskDSLParser {
 const (
 	RiskDSLParserEOF       = antlr.TokenEOF
 	RiskDSLParserBOOL_LIT  = 1
-	RiskDSLParserINT_LIT   = 2
-	RiskDSLParserFLOAT_LIT = 3
-	RiskDSLParserSTRING    = 4
-	RiskDSLParserID        = 5
-	RiskDSLParserAND       = 6
-	RiskDSLParserOR        = 7
-	RiskDSLParserNOT       = 8
-	RiskDSLParserGT        = 9
-	RiskDSLParserLT        = 10
-	RiskDSLParserGTE       = 11
-	RiskDSLParserLTE       = 12
-	RiskDSLParserEQ        = 13
-	RiskDSLParserNEQ       = 14
-	RiskDSLParserLPAREN    = 15
-	RiskDSLParserRPAREN    = 16
-	RiskDSLParserLBRACK    = 17
-	RiskDSLParserRBRACK    = 18
-	RiskDSLParserDOT       = 19
-	RiskDSLParserCOMMA     = 20
-	RiskDSLParserWS        = 21
+	RiskDSLParserNULL_LIT  = 2
+	RiskDSLParserIN        = 3
+	RiskDSLParserNOT_KW    = 4
+	RiskDSLParserINT_LIT   = 5
+	RiskDSLParserFLOAT_LIT = 6
+	RiskDSLParserSTRING    = 7
+	RiskDSLParserID        = 8
+	RiskDSLParserAND       = 9
+	RiskDSLParserOR        = 10
+	RiskDSLParserNOT       = 11
+	RiskDSLParserGT        = 12
+	RiskDSLParserLT        = 13
+	RiskDSLParserGTE       = 14
+	RiskDSLParserLTE       = 15
+	RiskDSLParserEQ        = 16
+	RiskDSLParserNEQ       = 17
+	RiskDSLParserQMARK     = 18
+	RiskDSLParserCOLON     = 19
+	RiskDSLParserLPAREN    = 20
+	RiskDSLParserRPAREN    = 21
+	RiskDSLParserLBRACK    = 22
+	RiskDSLParserRBRACK    = 23
+	RiskDSLParserDOT       = 24
+	RiskDSLParserCOMMA     = 25
+	RiskDSLParserWS        = 26
 )
 
 // RiskDSLParser rules.
@@ -419,6 +435,449 @@ func (s *BinaryCompareContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
+type IdentExprContext struct {
+	ExprContext
+	name antlr.Token
+}
+
+func NewIdentExprContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IdentExprContext {
+	var p = new(IdentExprContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *IdentExprContext) GetName() antlr.Token { return s.name }
+
+func (s *IdentExprContext) SetName(v antlr.Token) { s.name = v }
+
+func (s *IdentExprContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *IdentExprContext) ID() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserID, 0)
+}
+
+func (s *IdentExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitIdentExpr(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type InContext struct {
+	ExprContext
+	left  IExprContext
+	right IExprContext
+}
+
+func NewInContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *InContext {
+	var p = new(InContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *InContext) GetLeft() IExprContext { return s.left }
+
+func (s *InContext) GetRight() IExprContext { return s.right }
+
+func (s *InContext) SetLeft(v IExprContext) { s.left = v }
+
+func (s *InContext) SetRight(v IExprContext) { s.right = v }
+
+func (s *InContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *InContext) IN() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserIN, 0)
+}
+
+func (s *InContext) AllExpr() []IExprContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExprContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IExprContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExprContext); ok {
+			tst[i] = t.(IExprContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *InContext) Expr(i int) IExprContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExprContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IExprContext)
+}
+
+func (s *InContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitIn(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type TernaryContext struct {
+	ExprContext
+	cond     IExprContext
+	thenExpr IExprContext
+	elseExpr IExprContext
+}
+
+func NewTernaryContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *TernaryContext {
+	var p = new(TernaryContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *TernaryContext) GetCond() IExprContext { return s.cond }
+
+func (s *TernaryContext) GetThenExpr() IExprContext { return s.thenExpr }
+
+func (s *TernaryContext) GetElseExpr() IExprContext { return s.elseExpr }
+
+func (s *TernaryContext) SetCond(v IExprContext) { s.cond = v }
+
+func (s *TernaryContext) SetThenExpr(v IExprContext) { s.thenExpr = v }
+
+func (s *TernaryContext) SetElseExpr(v IExprContext) { s.elseExpr = v }
+
+func (s *TernaryContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *TernaryContext) QMARK() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserQMARK, 0)
+}
+
+func (s *TernaryContext) COLON() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserCOLON, 0)
+}
+
+func (s *TernaryContext) AllExpr() []IExprContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExprContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IExprContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExprContext); ok {
+			tst[i] = t.(IExprContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *TernaryContext) Expr(i int) IExprContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExprContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IExprContext)
+}
+
+func (s *TernaryContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitTernary(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type NotInContext struct {
+	ExprContext
+	left  IExprContext
+	right IExprContext
+}
+
+func NewNotInContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NotInContext {
+	var p = new(NotInContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *NotInContext) GetLeft() IExprContext { return s.left }
+
+func (s *NotInContext) GetRight() IExprContext { return s.right }
+
+func (s *NotInContext) SetLeft(v IExprContext) { s.left = v }
+
+func (s *NotInContext) SetRight(v IExprContext) { s.right = v }
+
+func (s *NotInContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *NotInContext) NOT_KW() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserNOT_KW, 0)
+}
+
+func (s *NotInContext) IN() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserIN, 0)
+}
+
+func (s *NotInContext) AllExpr() []IExprContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExprContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IExprContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExprContext); ok {
+			tst[i] = t.(IExprContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *NotInContext) Expr(i int) IExprContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExprContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IExprContext)
+}
+
+func (s *NotInContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitNotIn(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type ArrayLiteralContext struct {
+	ExprContext
+}
+
+func NewArrayLiteralContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArrayLiteralContext {
+	var p = new(ArrayLiteralContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *ArrayLiteralContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *ArrayLiteralContext) LBRACK() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserLBRACK, 0)
+}
+
+func (s *ArrayLiteralContext) RBRACK() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserRBRACK, 0)
+}
+
+func (s *ArrayLiteralContext) ArgList() IArgListContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IArgListContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IArgListContext)
+}
+
+func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitArrayLiteral(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type BinaryLogicalContext struct {
+	ExprContext
+	left  IExprContext
+	op    antlr.Token
+	right IExprContext
+}
+
+func NewBinaryLogicalContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BinaryLogicalContext {
+	var p = new(BinaryLogicalContext)
+
+	InitEmptyExprContext(&p.ExprContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExprContext))
+
+	return p
+}
+
+func (s *BinaryLogicalContext) GetOp() antlr.Token { return s.op }
+
+func (s *BinaryLogicalContext) SetOp(v antlr.Token) { s.op = v }
+
+func (s *BinaryLogicalContext) GetLeft() IExprContext { return s.left }
+
+func (s *BinaryLogicalContext) GetRight() IExprContext { return s.right }
+
+func (s *BinaryLogicalContext) SetLeft(v IExprContext) { s.left = v }
+
+func (s *BinaryLogicalContext) SetRight(v IExprContext) { s.right = v }
+
+func (s *BinaryLogicalContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *BinaryLogicalContext) AllExpr() []IExprContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExprContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IExprContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExprContext); ok {
+			tst[i] = t.(IExprContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *BinaryLogicalContext) Expr(i int) IExprContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExprContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IExprContext)
+}
+
+func (s *BinaryLogicalContext) AND() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserAND, 0)
+}
+
+func (s *BinaryLogicalContext) OR() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserOR, 0)
+}
+
+func (s *BinaryLogicalContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitBinaryLogical(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 type FuncCallContext struct {
 	ExprContext
 	callee antlr.Token
@@ -527,43 +986,6 @@ func (s *UnaryNotContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case RiskDSLVisitor:
 		return t.VisitUnaryNot(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-type IdentExprContext struct {
-	ExprContext
-	name antlr.Token
-}
-
-func NewIdentExprContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IdentExprContext {
-	var p = new(IdentExprContext)
-
-	InitEmptyExprContext(&p.ExprContext)
-	p.parser = parser
-	p.CopyAll(ctx.(*ExprContext))
-
-	return p
-}
-
-func (s *IdentExprContext) GetName() antlr.Token { return s.name }
-
-func (s *IdentExprContext) SetName(v antlr.Token) { s.name = v }
-
-func (s *IdentExprContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *IdentExprContext) ID() antlr.TerminalNode {
-	return s.GetToken(RiskDSLParserID, 0)
-}
-
-func (s *IdentExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case RiskDSLVisitor:
-		return t.VisitIdentExpr(s)
 
 	default:
 		return t.VisitChildren(s)
@@ -727,98 +1149,6 @@ func (s *FieldAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-type BinaryLogicalContext struct {
-	ExprContext
-	left  IExprContext
-	op    antlr.Token
-	right IExprContext
-}
-
-func NewBinaryLogicalContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BinaryLogicalContext {
-	var p = new(BinaryLogicalContext)
-
-	InitEmptyExprContext(&p.ExprContext)
-	p.parser = parser
-	p.CopyAll(ctx.(*ExprContext))
-
-	return p
-}
-
-func (s *BinaryLogicalContext) GetOp() antlr.Token { return s.op }
-
-func (s *BinaryLogicalContext) SetOp(v antlr.Token) { s.op = v }
-
-func (s *BinaryLogicalContext) GetLeft() IExprContext { return s.left }
-
-func (s *BinaryLogicalContext) GetRight() IExprContext { return s.right }
-
-func (s *BinaryLogicalContext) SetLeft(v IExprContext) { s.left = v }
-
-func (s *BinaryLogicalContext) SetRight(v IExprContext) { s.right = v }
-
-func (s *BinaryLogicalContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *BinaryLogicalContext) AllExpr() []IExprContext {
-	children := s.GetChildren()
-	len := 0
-	for _, ctx := range children {
-		if _, ok := ctx.(IExprContext); ok {
-			len++
-		}
-	}
-
-	tst := make([]IExprContext, len)
-	i := 0
-	for _, ctx := range children {
-		if t, ok := ctx.(IExprContext); ok {
-			tst[i] = t.(IExprContext)
-			i++
-		}
-	}
-
-	return tst
-}
-
-func (s *BinaryLogicalContext) Expr(i int) IExprContext {
-	var t antlr.RuleContext
-	j := 0
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExprContext); ok {
-			if j == i {
-				t = ctx.(antlr.RuleContext)
-				break
-			}
-			j++
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IExprContext)
-}
-
-func (s *BinaryLogicalContext) AND() antlr.TerminalNode {
-	return s.GetToken(RiskDSLParserAND, 0)
-}
-
-func (s *BinaryLogicalContext) OR() antlr.TerminalNode {
-	return s.GetToken(RiskDSLParserOR, 0)
-}
-
-func (s *BinaryLogicalContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case RiskDSLVisitor:
-		return t.VisitBinaryLogical(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ParenContext struct {
 	ExprContext
 	inner IExprContext
@@ -894,13 +1224,13 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(37)
+	p.SetState(42)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewUnaryNotContext(p, localctx)
 		p.SetParserRuleContext(localctx)
@@ -917,7 +1247,7 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 		{
 			p.SetState(13)
 
-			var _x = p.expr(9)
+			var _x = p.expr(13)
 
 			localctx.(*UnaryNotContext).operand = _x
 		}
@@ -952,7 +1282,7 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&33086) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&5245414) != 0 {
 			{
 				p.SetState(16)
 				p.ArgList()
@@ -1069,27 +1399,34 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 		}
 
 	case 5:
-		localctx = NewParenContext(p, localctx)
+		localctx = NewArrayLiteralContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
 			p.SetState(31)
-			p.Match(RiskDSLParserLPAREN)
+			p.Match(RiskDSLParserLBRACK)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
-		{
-			p.SetState(32)
+		p.SetState(33)
+		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
+		_la = p.GetTokenStream().LA(1)
 
-			var _x = p.expr(0)
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&5245414) != 0 {
+			{
+				p.SetState(32)
+				p.ArgList()
+			}
 
-			localctx.(*ParenContext).inner = _x
 		}
 		{
-			p.SetState(33)
-			p.Match(RiskDSLParserRPAREN)
+			p.SetState(35)
+			p.Match(RiskDSLParserRBRACK)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -1097,23 +1434,51 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 		}
 
 	case 6:
+		localctx = NewParenContext(p, localctx)
+		p.SetParserRuleContext(localctx)
+		_prevctx = localctx
+		{
+			p.SetState(36)
+			p.Match(RiskDSLParserLPAREN)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+		{
+			p.SetState(37)
+
+			var _x = p.expr(0)
+
+			localctx.(*ParenContext).inner = _x
+		}
+		{
+			p.SetState(38)
+			p.Match(RiskDSLParserRPAREN)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
+	case 7:
 		localctx = NewLiteralExprContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(35)
+			p.SetState(40)
 
 			var _x = p.Literal()
 
 			localctx.(*LiteralExprContext).lit = _x
 		}
 
-	case 7:
+	case 8:
 		localctx = NewIdentExprContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(36)
+			p.SetState(41)
 
 			var _m = p.Match(RiskDSLParserID)
 
@@ -1128,12 +1493,12 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(47)
+	p.SetState(65)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -1143,26 +1508,26 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 				p.TriggerExitRuleEvent()
 			}
 			_prevctx = localctx
-			p.SetState(45)
+			p.SetState(63)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
 
-			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext()) {
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewBinaryCompareContext(p, NewExprContext(p, _parentctx, _parentState))
 				localctx.(*BinaryCompareContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, RiskDSLParserRULE_expr)
-				p.SetState(39)
+				p.SetState(44)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
-					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(40)
+					p.SetState(45)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -1170,7 +1535,7 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 
 					_la = p.GetTokenStream().LA(1)
 
-					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&32256) != 0) {
+					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&258048) != 0) {
 						var _ri = p.GetErrorHandler().RecoverInline(p)
 
 						localctx.(*BinaryCompareContext).op = _ri
@@ -1180,26 +1545,88 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 					}
 				}
 				{
-					p.SetState(41)
+					p.SetState(46)
 
-					var _x = p.expr(9)
+					var _x = p.expr(13)
 
 					localctx.(*BinaryCompareContext).right = _x
 				}
 
 			case 2:
+				localctx = NewNotInContext(p, NewExprContext(p, _parentctx, _parentState))
+				localctx.(*NotInContext).left = _prevctx
+
+				p.PushNewRecursionContext(localctx, _startState, RiskDSLParserRULE_expr)
+				p.SetState(47)
+
+				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					goto errorExit
+				}
+				{
+					p.SetState(48)
+					p.Match(RiskDSLParserNOT_KW)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
+				}
+				{
+					p.SetState(49)
+					p.Match(RiskDSLParserIN)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
+				}
+				{
+					p.SetState(50)
+
+					var _x = p.expr(12)
+
+					localctx.(*NotInContext).right = _x
+				}
+
+			case 3:
+				localctx = NewInContext(p, NewExprContext(p, _parentctx, _parentState))
+				localctx.(*InContext).left = _prevctx
+
+				p.PushNewRecursionContext(localctx, _startState, RiskDSLParserRULE_expr)
+				p.SetState(51)
+
+				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					goto errorExit
+				}
+				{
+					p.SetState(52)
+					p.Match(RiskDSLParserIN)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
+				}
+				{
+					p.SetState(53)
+
+					var _x = p.expr(11)
+
+					localctx.(*InContext).right = _x
+				}
+
+			case 4:
 				localctx = NewBinaryLogicalContext(p, NewExprContext(p, _parentctx, _parentState))
 				localctx.(*BinaryLogicalContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, RiskDSLParserRULE_expr)
-				p.SetState(42)
+				p.SetState(54)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
-					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
 					goto errorExit
 				}
 				{
-					p.SetState(43)
+					p.SetState(55)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -1217,11 +1644,53 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 					}
 				}
 				{
-					p.SetState(44)
+					p.SetState(56)
 
-					var _x = p.expr(8)
+					var _x = p.expr(10)
 
 					localctx.(*BinaryLogicalContext).right = _x
+				}
+
+			case 5:
+				localctx = NewTernaryContext(p, NewExprContext(p, _parentctx, _parentState))
+				localctx.(*TernaryContext).cond = _prevctx
+
+				p.PushNewRecursionContext(localctx, _startState, RiskDSLParserRULE_expr)
+				p.SetState(57)
+
+				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					goto errorExit
+				}
+				{
+					p.SetState(58)
+					p.Match(RiskDSLParserQMARK)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
+				}
+				{
+					p.SetState(59)
+
+					var _x = p.expr(0)
+
+					localctx.(*TernaryContext).thenExpr = _x
+				}
+				{
+					p.SetState(60)
+					p.Match(RiskDSLParserCOLON)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
+				}
+				{
+					p.SetState(61)
+
+					var _x = p.expr(9)
+
+					localctx.(*TernaryContext).elseExpr = _x
 				}
 
 			case antlr.ATNInvalidAltNumber:
@@ -1229,12 +1698,12 @@ func (p *RiskDSLParser) expr(_p int) (localctx IExprContext) {
 			}
 
 		}
-		p.SetState(49)
+		p.SetState(67)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -1376,10 +1845,10 @@ func (p *RiskDSLParser) ArgList() (localctx IArgListContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(50)
+		p.SetState(68)
 		p.expr(0)
 	}
-	p.SetState(55)
+	p.SetState(73)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1388,7 +1857,7 @@ func (p *RiskDSLParser) ArgList() (localctx IArgListContext) {
 
 	for _la == RiskDSLParserCOMMA {
 		{
-			p.SetState(51)
+			p.SetState(69)
 			p.Match(RiskDSLParserCOMMA)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1396,11 +1865,11 @@ func (p *RiskDSLParser) ArgList() (localctx IArgListContext) {
 			}
 		}
 		{
-			p.SetState(52)
+			p.SetState(70)
 			p.expr(0)
 		}
 
-		p.SetState(57)
+		p.SetState(75)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1603,10 +2072,42 @@ func (s *IntLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
+type NullLiteralContext struct {
+	LiteralContext
+}
+
+func NewNullLiteralContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NullLiteralContext {
+	var p = new(NullLiteralContext)
+
+	InitEmptyLiteralContext(&p.LiteralContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*LiteralContext))
+
+	return p
+}
+
+func (s *NullLiteralContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *NullLiteralContext) NULL_LIT() antlr.TerminalNode {
+	return s.GetToken(RiskDSLParserNULL_LIT, 0)
+}
+
+func (s *NullLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case RiskDSLVisitor:
+		return t.VisitNullLiteral(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 func (p *RiskDSLParser) Literal() (localctx ILiteralContext) {
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, RiskDSLParserRULE_literal)
-	p.SetState(62)
+	p.SetState(81)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1617,7 +2118,7 @@ func (p *RiskDSLParser) Literal() (localctx ILiteralContext) {
 		localctx = NewIntLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(58)
+			p.SetState(76)
 			p.Match(RiskDSLParserINT_LIT)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1629,7 +2130,7 @@ func (p *RiskDSLParser) Literal() (localctx ILiteralContext) {
 		localctx = NewFloatLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(59)
+			p.SetState(77)
 			p.Match(RiskDSLParserFLOAT_LIT)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1641,7 +2142,7 @@ func (p *RiskDSLParser) Literal() (localctx ILiteralContext) {
 		localctx = NewStringLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(60)
+			p.SetState(78)
 			p.Match(RiskDSLParserSTRING)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1653,8 +2154,20 @@ func (p *RiskDSLParser) Literal() (localctx ILiteralContext) {
 		localctx = NewBoolLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(61)
+			p.SetState(79)
 			p.Match(RiskDSLParserBOOL_LIT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
+	case RiskDSLParserNULL_LIT:
+		localctx = NewNullLiteralContext(p, localctx)
+		p.EnterOuterAlt(localctx, 5)
+		{
+			p.SetState(80)
+			p.Match(RiskDSLParserNULL_LIT)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -1696,10 +2209,19 @@ func (p *RiskDSLParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex
 func (p *RiskDSLParser) Expr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 0:
-		return p.Precpred(p.GetParserRuleContext(), 8)
+		return p.Precpred(p.GetParserRuleContext(), 12)
 
 	case 1:
-		return p.Precpred(p.GetParserRuleContext(), 7)
+		return p.Precpred(p.GetParserRuleContext(), 11)
+
+	case 2:
+		return p.Precpred(p.GetParserRuleContext(), 10)
+
+	case 3:
+		return p.Precpred(p.GetParserRuleContext(), 9)
+
+	case 4:
+		return p.Precpred(p.GetParserRuleContext(), 8)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

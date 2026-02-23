@@ -1,4 +1,4 @@
-// Code generated from grammar/RiskDSL.g4 by ANTLR 4.13.2. DO NOT EDIT.
+// Code generated from RiskDSL.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser // RiskDSL
 import "github.com/antlr4-go/antlr/v4"
@@ -13,14 +13,29 @@ type RiskDSLVisitor interface {
 	// Visit a parse tree produced by RiskDSLParser#BinaryCompare.
 	VisitBinaryCompare(ctx *BinaryCompareContext) interface{}
 
+	// Visit a parse tree produced by RiskDSLParser#IdentExpr.
+	VisitIdentExpr(ctx *IdentExprContext) interface{}
+
+	// Visit a parse tree produced by RiskDSLParser#In.
+	VisitIn(ctx *InContext) interface{}
+
+	// Visit a parse tree produced by RiskDSLParser#Ternary.
+	VisitTernary(ctx *TernaryContext) interface{}
+
+	// Visit a parse tree produced by RiskDSLParser#NotIn.
+	VisitNotIn(ctx *NotInContext) interface{}
+
+	// Visit a parse tree produced by RiskDSLParser#ArrayLiteral.
+	VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
+
+	// Visit a parse tree produced by RiskDSLParser#BinaryLogical.
+	VisitBinaryLogical(ctx *BinaryLogicalContext) interface{}
+
 	// Visit a parse tree produced by RiskDSLParser#FuncCall.
 	VisitFuncCall(ctx *FuncCallContext) interface{}
 
 	// Visit a parse tree produced by RiskDSLParser#UnaryNot.
 	VisitUnaryNot(ctx *UnaryNotContext) interface{}
-
-	// Visit a parse tree produced by RiskDSLParser#IdentExpr.
-	VisitIdentExpr(ctx *IdentExprContext) interface{}
 
 	// Visit a parse tree produced by RiskDSLParser#LiteralExpr.
 	VisitLiteralExpr(ctx *LiteralExprContext) interface{}
@@ -30,9 +45,6 @@ type RiskDSLVisitor interface {
 
 	// Visit a parse tree produced by RiskDSLParser#FieldAccess.
 	VisitFieldAccess(ctx *FieldAccessContext) interface{}
-
-	// Visit a parse tree produced by RiskDSLParser#BinaryLogical.
-	VisitBinaryLogical(ctx *BinaryLogicalContext) interface{}
 
 	// Visit a parse tree produced by RiskDSLParser#Paren.
 	VisitParen(ctx *ParenContext) interface{}
@@ -51,4 +63,7 @@ type RiskDSLVisitor interface {
 
 	// Visit a parse tree produced by RiskDSLParser#BoolLiteral.
 	VisitBoolLiteral(ctx *BoolLiteralContext) interface{}
+
+	// Visit a parse tree produced by RiskDSLParser#NullLiteral.
+	VisitNullLiteral(ctx *NullLiteralContext) interface{}
 }

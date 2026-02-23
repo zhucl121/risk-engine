@@ -16,13 +16,21 @@ import (
 	"github.com/yourorg/riskengine/internal/engine"
 )
 
+type shadowPolicyYAML struct {
+	SceneCode string `yaml:"sceneCode"`
+	Version   string `yaml:"version"`
+}
+
 // policySetYAML mirrors PolicySet for YAML unmarshalling.
 type policySetYAML struct {
-	SceneCode   string            `yaml:"sceneCode"`
-	Version     string            `yaml:"version"`
-	Fallback    string            `yaml:"fallback"`
-	Pipeline    []stepYAML        `yaml:"pipeline"`
-	ABTest      *abTestYAML       `yaml:"abTest"`
+	SceneCode string `yaml:"sceneCode"`
+	Version   string `yaml:"version"`
+	Fallback  string `yaml:"fallback"`
+	Strategy  string `yaml:"strategy"` // HIGHEST_RISK | WEIGHTED | RULE_FIRST
+	Pipeline  []stepYAML `yaml:"pipeline"`
+	ABTest    *abTestYAML `yaml:"abTest"`
+	// ShadowPolicies lists policies to run in shadow/dry-run mode.
+	ShadowPolicies []shadowPolicyYAML `yaml:"shadowPolicies"`
 	// ExtraSchema declares the type for each Extra key.
 	// Supported types: string (default), int, float, bool.
 	ExtraSchema map[string]string `yaml:"extraSchema"`
@@ -35,21 +43,31 @@ type abTestYAML struct {
 	ExperimentPipeline []stepYAML `yaml:"experimentPipeline"`
 }
 
+type stepRetryYAML struct {
+	MaxAttempts int `yaml:"maxAttempts"`
+	DelayMs     int `yaml:"delayMs"`
+}
+
 type stepYAML struct {
-	Name            string            `yaml:"name"`
-	Kind            string            `yaml:"kind"`
-	RuleGroup       string            `yaml:"ruleGroup"`
-	Models          []string          `yaml:"models"`
-	TimeoutMs       int               `yaml:"timeoutMs"`
-	Parallel        bool              `yaml:"parallel"`
-	OnFailure       string            `yaml:"onFailure"`
-	Strategy        string            `yaml:"strategy"`
+	Name      string  `yaml:"name"`
+	Kind      string  `yaml:"kind"`
+	RuleGroup string  `yaml:"ruleGroup"`
+	Models    []string `yaml:"models"`
+	TimeoutMs int     `yaml:"timeoutMs"`
+	Parallel  bool    `yaml:"parallel"`
+	OnFailure string  `yaml:"onFailure"`
+	Strategy  string  `yaml:"strategy"` // per-step aggregation (for AGGREGATE kind)
+	Weight    float64 `yaml:"weight"`   // used by WEIGHTED pipeline strategy
+	// Condition is a DSL expression; step is skipped when it evaluates to false.
+	Condition string `yaml:"condition"`
+	// Retry configures automatic retry.
+	Retry stepRetryYAML `yaml:"retry"`
 	// ParamMapping maps downstream parameter names to source expressions.
 	// e.g. {"merchant_id": "extra.merchant_id", "channel": "WEB"}
-	ParamMapping    map[string]string `yaml:"params"`
+	ParamMapping map[string]string `yaml:"params"`
 	// ListQueryFields overrides the default user/device/ip list queries.
 	// e.g. ["extra.merchant_id", "request.ip"]
-	ListQueryFields []string          `yaml:"listQueryFields"`
+	ListQueryFields []string `yaml:"listQueryFields"`
 }
 
 // atomicRegistry is the concrete Registry implementation.
@@ -80,9 +98,13 @@ func (r *atomicRegistry) Get(sceneCode string) (Pipeline, error) {
 
 // Reload atomically replaces all registered pipelines.
 func (r *atomicRegistry) Reload(_ context.Context, policies []PolicySet) error {
+	// Inject back-reference so pipelines can look up shadow policies.
+	deps := r.deps
+	deps.Registry = r
+
 	m := make(map[string]Pipeline, len(policies))
 	for _, ps := range policies {
-		m[ps.SceneCode] = newPipeline(ps, r.deps)
+		m[ps.SceneCode] = newPipeline(ps, deps)
 	}
 	r.pipelines.Store(&m)
 	return nil
@@ -172,13 +194,36 @@ func convertPolicy(y policySetYAML) (PolicySet, error) {
 		schema[k] = ExtraFieldType(v)
 	}
 
+	var pipelineStrategy AggregationStrategy
+	switch y.Strategy {
+	case "WEIGHTED":
+		pipelineStrategy = AggregationWeighted
+	case "RULE_FIRST":
+		pipelineStrategy = AggregationRuleFirst
+	default:
+		pipelineStrategy = AggregationHighestRisk
+	}
+
+	// Parse ShadowPolicies.
+	shadowPolicies := make([]ShadowPolicyRef, 0, len(y.ShadowPolicies))
+	for _, sp := range y.ShadowPolicies {
+		if sp.SceneCode != "" {
+			shadowPolicies = append(shadowPolicies, ShadowPolicyRef{
+				SceneCode: sp.SceneCode,
+				Version:   sp.Version,
+			})
+		}
+	}
+
 	return PolicySet{
-		SceneCode:   y.SceneCode,
-		Version:     y.Version,
-		Pipeline:    steps,
-		Fallback:    fallback,
-		ABTest:      abTest,
-		ExtraSchema: schema,
+		SceneCode:      y.SceneCode,
+		Version:        y.Version,
+		Pipeline:       steps,
+		Fallback:       fallback,
+		Strategy:       pipelineStrategy,
+		ABTest:         abTest,
+		ShadowPolicies: shadowPolicies,
+		ExtraSchema:    schema,
 	}, nil
 }
 
@@ -216,14 +261,20 @@ func convertStep(sy stepYAML) (Step, error) {
 	}
 
 	return Step{
-		Name:            sy.Name,
-		Kind:            kind,
-		RuleGroup:       sy.RuleGroup,
-		Models:          sy.Models,
-		Timeout:         millisToDuration(sy.TimeoutMs),
-		Parallel:        sy.Parallel,
-		OnFailure:       fp,
-		Strategy:        AggregationStrategy(sy.Strategy),
+		Name:      sy.Name,
+		Kind:      kind,
+		RuleGroup: sy.RuleGroup,
+		Models:    sy.Models,
+		Timeout:   millisToDuration(sy.TimeoutMs),
+		Parallel:  sy.Parallel,
+		OnFailure: fp,
+		Strategy:  AggregationStrategy(sy.Strategy),
+		Weight:    sy.Weight,
+		Condition: sy.Condition,
+		Retry: RetryConfig{
+			MaxAttempts: sy.Retry.MaxAttempts,
+			DelayMs:     sy.Retry.DelayMs,
+		},
 		ParamMapping:    pm,
 		ListQueryFields: sy.ListQueryFields,
 	}, nil

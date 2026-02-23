@@ -109,3 +109,36 @@ type BoolLit struct {
 }
 
 func (n *BoolLit) Pos() (int, int) { return n.Line, n.Col }
+
+// ArrayLit is an array literal: [elem1, elem2, ...].
+// Used as the right-hand side of the `in` operator, e.g. amount in [100, 200, 300].
+type ArrayLit struct {
+	Elems     []Node
+	Line, Col int
+}
+
+func (n *ArrayLit) Pos() (int, int) { return n.Line, n.Col }
+
+// InExpr is a membership test: Value in Array.
+// Evaluates to true when the value equals any element in the array.
+// Example: status in ['active', 'trial']
+type InExpr struct {
+	Value     Node     // the left-hand side expression
+	Array     Node     // must evaluate to ArrayLit at runtime
+	Negated   bool     // true → "not in"
+	Line, Col int
+}
+
+func (n *InExpr) Pos() (int, int) { return n.Line, n.Col }
+
+// TernaryExpr is a conditional expression: Condition ? Then : Else.
+// Condition must evaluate to bool; Then and Else may be any type.
+// Example: amount > 1000 ? 'high' : 'low'
+type TernaryExpr struct {
+	Condition Node
+	Then      Node
+	Else      Node
+	Line, Col int
+}
+
+func (n *TernaryExpr) Pos() (int, int) { return n.Line, n.Col }

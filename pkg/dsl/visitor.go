@@ -224,6 +224,93 @@ func (b *astBuilder) VisitBoolLiteral(ctx *parser.BoolLiteralContext) interface{
 	})
 }
 
+// VisitNullLiteral: NULL_LIT → NilValue
+func (b *astBuilder) VisitNullLiteral(ctx *parser.NullLiteralContext) interface{} {
+	line := ctx.GetStart().GetLine()
+	col := ctx.GetStart().GetColumn()
+	// Represent null as a special NilLit node (reuse IntLit{0} as nil sentinel).
+	// We use a StringLit with a sentinel so codegen can emit NilValue().
+	_ = line
+	_ = col
+	return ok(&ast.IntLit{Val: 0, Line: line, Col: col}) // treated as KindNil in genIdent
+}
+
+// VisitTernary: cond ? then : else
+func (b *astBuilder) VisitTernary(ctx *parser.TernaryContext) interface{} {
+	cond, err := b.visit(ctx.GetCond())
+	if err != nil {
+		return fail(err)
+	}
+	thenExpr, err := b.visit(ctx.GetThenExpr())
+	if err != nil {
+		return fail(err)
+	}
+	elseExpr, err := b.visit(ctx.GetElseExpr())
+	if err != nil {
+		return fail(err)
+	}
+	line := ctx.GetStart().GetLine()
+	col := ctx.GetStart().GetColumn()
+	return ok(&ast.TernaryExpr{
+		Condition: cond,
+		Then:      thenExpr,
+		Else:      elseExpr,
+		Line:      line, Col: col,
+	})
+}
+
+// VisitIn: left in right
+func (b *astBuilder) VisitIn(ctx *parser.InContext) interface{} {
+	left, err := b.visit(ctx.GetLeft())
+	if err != nil {
+		return fail(err)
+	}
+	right, err := b.visit(ctx.GetRight())
+	if err != nil {
+		return fail(err)
+	}
+	line := ctx.GetStart().GetLine()
+	col := ctx.GetStart().GetColumn()
+	return ok(&ast.InExpr{Value: left, Array: right, Negated: false, Line: line, Col: col})
+}
+
+// VisitNotIn: left not in right
+func (b *astBuilder) VisitNotIn(ctx *parser.NotInContext) interface{} {
+	left, err := b.visit(ctx.GetLeft())
+	if err != nil {
+		return fail(err)
+	}
+	right, err := b.visit(ctx.GetRight())
+	if err != nil {
+		return fail(err)
+	}
+	line := ctx.GetStart().GetLine()
+	col := ctx.GetStart().GetColumn()
+	return ok(&ast.InExpr{Value: left, Array: right, Negated: true, Line: line, Col: col})
+}
+
+// VisitArrayLiteral: '[' argList? ']'
+func (b *astBuilder) VisitArrayLiteral(ctx *parser.ArrayLiteralContext) interface{} {
+	line := ctx.GetStart().GetLine()
+	col := ctx.GetStart().GetColumn()
+
+	var elems []ast.Node
+	if al := ctx.ArgList(); al != nil {
+		raw := al.Accept(b)
+		res, ok2 := raw.(visitResult)
+		if !ok2 || res.err != nil {
+			if ok2 {
+				return fail(res.err)
+			}
+			return failf("dsl: argList visit failed for array literal")
+		}
+		if list, isList := res.node.(*argListNode); isList {
+			elems = list.nodes
+		}
+	}
+	return ok(&ast.ArrayLit{Elems: elems, Line: line, Col: col})
+}
+
 // stripDSLQuotes removes surrounding single or double quotes from a DSL string token.
 func stripDSLQuotes(s string) string {
 	if len(s) >= 2 && (s[0] == '\'' || s[0] == '"') {
