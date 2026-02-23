@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // GeoIPLookup is the interface for IP geolocation. Implementations are injected

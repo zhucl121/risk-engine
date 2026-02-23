@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 func registerMath(reg *dsl.FunctionRegistry) error {

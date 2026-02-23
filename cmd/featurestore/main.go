@@ -24,11 +24,11 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
-	"github.com/yourorg/riskengine/internal/config"
-	fserver "github.com/yourorg/riskengine/internal/featurestore/server"
-	"github.com/yourorg/riskengine/internal/featurestore/store"
-	"github.com/yourorg/riskengine/pkg/sliding"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
+	"github.com/zhucl121/risk-engine/internal/config"
+	fserver "github.com/zhucl121/risk-engine/internal/featurestore/server"
+	"github.com/zhucl121/risk-engine/internal/featurestore/store"
+	"github.com/zhucl121/risk-engine/pkg/sliding"
 
 	"github.com/redis/go-redis/v9"
 )

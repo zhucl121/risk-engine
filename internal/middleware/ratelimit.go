@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 
-	"github.com/yourorg/riskengine/internal/metrics"
+	"github.com/zhucl121/risk-engine/internal/metrics"
 )
 
 // RateLimitConfig controls the two-tier token-bucket limiter.

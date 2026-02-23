@@ -17,8 +17,8 @@ import (
 
 	"go.uber.org/zap"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
-	"github.com/yourorg/riskengine/internal/featurestore/store"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
+	"github.com/zhucl121/risk-engine/internal/featurestore/store"
 )
 
 // FeatureStoreServer implements riskv1.FeatureStoreServiceServer.

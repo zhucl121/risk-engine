@@ -15,7 +15,7 @@ package builtins
 import (
 	"fmt"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // Deps holds service dependencies required by builtin functions.

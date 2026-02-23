@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
 )
 
 // ClientConfig holds gRPC connection settings for the Feature Store.

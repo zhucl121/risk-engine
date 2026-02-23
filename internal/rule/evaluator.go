@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 // atomicEvaluator is a thread-safe Evaluator that supports hot-reload via

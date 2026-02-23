@@ -9,8 +9,8 @@ package rule
 import (
 	"context"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
 )
 
 // Context bundles all inputs available to a rule during evaluation.

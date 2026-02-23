@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/pkg/sliding"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/pkg/sliding"
 )
 
 // velocityWindow is one sliding-window dimension exposed to the Feature Store.

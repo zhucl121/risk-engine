@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/pkg/sliding"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/pkg/sliding"
 )
 
 // velocityDim describes one velocity dimension (window + feature key).

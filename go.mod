@@ -1,4 +1,4 @@
-module github.com/yourorg/riskengine
+module github.com/zhucl121/risk-engine
 
 go 1.24.0
 

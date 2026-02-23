@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/internal/list"
-	"github.com/yourorg/riskengine/internal/model"
-	"github.com/yourorg/riskengine/internal/orchestrator"
-	"github.com/yourorg/riskengine/internal/rule"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/list"
+	"github.com/zhucl121/risk-engine/internal/model"
+	"github.com/zhucl121/risk-engine/internal/orchestrator"
+	"github.com/zhucl121/risk-engine/internal/rule"
 )
 
 // --- stubs ------------------------------------------------------------------

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/yourorg/riskengine/internal/audit"
+	"github.com/zhucl121/risk-engine/internal/audit"
 )
 
 func newRecord(id string) *audit.Record {

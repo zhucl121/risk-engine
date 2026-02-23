@@ -11,15 +11,15 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/yourorg/riskengine/internal/audit"
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/internal/list"
-	"github.com/yourorg/riskengine/internal/model"
-	"github.com/yourorg/riskengine/internal/resilience"
-	"github.com/yourorg/riskengine/internal/rule"
-	"github.com/yourorg/riskengine/internal/scene"
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/internal/audit"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/list"
+	"github.com/zhucl121/risk-engine/internal/model"
+	"github.com/zhucl121/risk-engine/internal/resilience"
+	"github.com/zhucl121/risk-engine/internal/rule"
+	"github.com/zhucl121/risk-engine/internal/scene"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // Deps bundles all service dependencies the pipeline dispatches to.

@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // withinFn implements within(v, lo, hi) → bool: returns lo <= v <= hi.

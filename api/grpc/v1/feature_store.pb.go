@@ -601,7 +601,7 @@ const file_feature_store_proto_rawDesc = "" +
 	"\x13FeatureStoreService\x12T\n" +
 	"\vGetFeatures\x12!.riskengine.v1.GetFeaturesRequest\x1a\".riskengine.v1.GetFeaturesResponse\x12c\n" +
 	"\x10BatchGetFeatures\x12&.riskengine.v1.BatchGetFeaturesRequest\x1a'.riskengine.v1.BatchGetFeaturesResponse\x12]\n" +
-	"\x06Health\x12(.riskengine.v1.FeatureStoreHealthRequest\x1a).riskengine.v1.FeatureStoreHealthResponseB2Z0github.com/yourorg/riskengine/api/grpc/v1;riskv1b\x06proto3"
+	"\x06Health\x12(.riskengine.v1.FeatureStoreHealthRequest\x1a).riskengine.v1.FeatureStoreHealthResponseB2Z0github.com/zhucl121/risk-engine/api/grpc/v1;riskv1b\x06proto3"
 
 var (
 	file_feature_store_proto_rawDescOnce sync.Once

@@ -7,8 +7,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
 )
 
 // Runtime holds all per-request dependencies that DSL functions can access.

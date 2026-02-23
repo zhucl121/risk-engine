@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/riskengine/internal/scene"
+	"github.com/zhucl121/risk-engine/internal/scene"
 )
 
 // ExtraParamsHandler manages /admin/v1/scenes/:scene/extra-params endpoints.

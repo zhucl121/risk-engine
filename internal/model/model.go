@@ -12,7 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/yourorg/riskengine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/feature"
 )
 
 // Scorer runs ML inference for a single model and returns a risk score in [0, 1].

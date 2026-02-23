@@ -10,7 +10,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 // StepKind identifies the type of work performed in a pipeline step.

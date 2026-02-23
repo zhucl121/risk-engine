@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
-	"github.com/yourorg/riskengine/internal/engine"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 // DecisionServer implements riskv1.DecisionServiceServer.

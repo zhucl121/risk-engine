@@ -13,8 +13,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
-	"github.com/yourorg/riskengine/pkg/dsl/builtins"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl/builtins"
 )
 
 // paymentRuleConditions mirrors exactly the condition strings from

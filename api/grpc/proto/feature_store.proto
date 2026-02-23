@@ -5,7 +5,7 @@ syntax = "proto3";
 
 package riskengine.v1;
 
-option go_package = "github.com/yourorg/riskengine/api/grpc/v1;riskv1";
+option go_package = "github.com/zhucl121/risk-engine/api/grpc/v1;riskv1";
 
 // FeatureStoreService provides batch feature lookup for the decision engine.
 // It is designed to be deployed as a sidecar or standalone microservice.

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // commonFormats are tried in order when parsing a time string.

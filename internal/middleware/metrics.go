@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/yourorg/riskengine/internal/metrics"
+	"github.com/zhucl121/risk-engine/internal/metrics"
 )
 
 // Metrics returns a gin middleware that records HTTP request duration and

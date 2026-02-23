@@ -9,9 +9,9 @@ package rules
 
 import (
     "context"
-    "github.com/yourorg/riskengine/internal/engine"
-    "github.com/yourorg/riskengine/internal/feature"
-    "github.com/yourorg/riskengine/internal/rule"
+    "github.com/zhucl121/risk-engine/internal/engine"
+    "github.com/zhucl121/risk-engine/internal/feature"
+    "github.com/zhucl121/risk-engine/internal/rule"
 )
 
 // DeviceMultiAccountRule rejects when a device is linked to too many accounts.

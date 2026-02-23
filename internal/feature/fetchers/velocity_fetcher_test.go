@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/internal/feature/fetchers"
-	"github.com/yourorg/riskengine/pkg/sliding"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/feature/fetchers"
+	"github.com/zhucl121/risk-engine/pkg/sliding"
 )
 
 // stubRedis implements the minimal redis.UniversalClient surface needed by

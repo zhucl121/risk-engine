@@ -27,7 +27,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: riskengine
-          image: ghcr.io/yourorg/riskengine:latest
+          image: ghcr.io/zhucl121/risk-engine:latest
           imagePullPolicy: Always
           ports:
             - name: http

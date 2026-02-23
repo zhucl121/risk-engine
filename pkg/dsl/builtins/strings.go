@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // regexpCache caches compiled regular expressions for the match() function.

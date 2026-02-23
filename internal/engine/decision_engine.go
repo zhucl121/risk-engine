@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/riskengine/internal/audit"
+	"github.com/zhucl121/risk-engine/internal/audit"
 )
 
 // Evaluator is a local interface that the decisionEngine uses to call the

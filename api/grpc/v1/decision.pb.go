@@ -577,7 +577,7 @@ const file_decision_proto_rawDesc = "" +
 	"\x0fDecisionService\x12K\n" +
 	"\bEvaluate\x12\x1e.riskengine.v1.DecisionRequest\x1a\x1f.riskengine.v1.DecisionResponse\x12Z\n" +
 	"\rBatchEvaluate\x12#.riskengine.v1.BatchDecisionRequest\x1a$.riskengine.v1.BatchDecisionResponse\x12E\n" +
-	"\x06Health\x12\x1c.riskengine.v1.HealthRequest\x1a\x1d.riskengine.v1.HealthResponseB2Z0github.com/yourorg/riskengine/api/grpc/v1;riskv1b\x06proto3"
+	"\x06Health\x12\x1c.riskengine.v1.HealthRequest\x1a\x1d.riskengine.v1.HealthResponseB2Z0github.com/zhucl121/risk-engine/api/grpc/v1;riskv1b\x06proto3"
 
 var (
 	file_decision_proto_rawDescOnce sync.Once

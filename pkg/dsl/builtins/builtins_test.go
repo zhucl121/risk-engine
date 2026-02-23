@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/pkg/dsl"
-	"github.com/yourorg/riskengine/pkg/dsl/builtins"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl/builtins"
 )
 
 func setupRegistry(t *testing.T) *dsl.FunctionRegistry {

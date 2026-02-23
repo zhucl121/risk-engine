@@ -10,11 +10,11 @@ import (
 
 	"go.uber.org/zap"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/internal/health"
-	"github.com/yourorg/riskengine/internal/metrics"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/health"
+	"github.com/zhucl121/risk-engine/internal/metrics"
 )
 
 // Fetcher adapts Client to the feature.Fetcher interface so it can be

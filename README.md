@@ -2,9 +2,9 @@
 
 [![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourorg/riskengine)](https://goreportcard.com/report/github.com/yourorg/riskengine)
-[![CI](https://github.com/yourorg/riskengine/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/riskengine/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/yourorg/riskengine/graph/badge.svg)](https://codecov.io/gh/yourorg/riskengine)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zhucl121/risk-engine)](https://goreportcard.com/report/github.com/zhucl121/risk-engine)
+[![CI](https://github.com/zhucl121/risk-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/zhucl121/risk-engine/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/zhucl121/risk-engine/graph/badge.svg)](https://codecov.io/gh/zhucl121/risk-engine)
 
 **RiskEngine** is a high-performance, open-source risk decision engine written in Go. It is designed for real-time fraud detection in payment, marketing promotion, and transaction scenarios. It delivers **P99 < 60ms** decisions at **20,000+ TPS** on commodity hardware.
 
@@ -71,7 +71,7 @@
 ### Run locally
 
 ```bash
-git clone https://github.com/yourorg/riskengine.git
+git clone https://github.com/zhucl121/risk-engine.git
 cd riskengine
 
 # copy and edit config

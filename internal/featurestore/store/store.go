@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"sync"
 
-	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
+	riskv1 "github.com/zhucl121/risk-engine/api/grpc/v1"
 )
 
 // FeatureGroup fetches features for a named group given an entity context.

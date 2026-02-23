@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // modelScoreFn implements modelScore(modelName string) → float.

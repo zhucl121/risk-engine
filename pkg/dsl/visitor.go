@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/yourorg/riskengine/pkg/dsl/ast"
-	"github.com/yourorg/riskengine/pkg/dsl/parser"
+	"github.com/zhucl121/risk-engine/pkg/dsl/ast"
+	"github.com/zhucl121/risk-engine/pkg/dsl/parser"
 )
 
 // astBuilder implements parser.RiskDSLVisitor and produces ast.Node values.

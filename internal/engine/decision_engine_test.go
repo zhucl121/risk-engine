@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/yourorg/riskengine/internal/audit"
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/audit"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 // stubEvaluator implements engine.Evaluator for testing.

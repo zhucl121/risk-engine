@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yourorg/riskengine/internal/list"
+	"github.com/zhucl121/risk-engine/internal/list"
 )
 
 // fakeRedis is a minimal in-memory Redis client for testing.

@@ -2,9 +2,9 @@
 
 [![Go 版本](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourorg/riskengine)](https://goreportcard.com/report/github.com/yourorg/riskengine)
-[![CI](https://github.com/yourorg/riskengine/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/riskengine/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/yourorg/riskengine/graph/badge.svg)](https://codecov.io/gh/yourorg/riskengine)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zhucl121/risk-engine)](https://goreportcard.com/report/github.com/zhucl121/risk-engine)
+[![CI](https://github.com/zhucl121/risk-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/zhucl121/risk-engine/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/zhucl121/risk-engine/graph/badge.svg)](https://codecov.io/gh/zhucl121/risk-engine)
 
 **RiskEngine** 是一款基于 Go 语言开发的高性能开源风控决策引擎，专为支付、营销活动、交易等场景的实时欺诈检测设计。在普通硬件上可达到 **P99 < 60ms**、**20,000+ TPS** 的决策能力。
 
@@ -71,7 +71,7 @@
 ### 本地运行
 
 ```bash
-git clone https://github.com/yourorg/riskengine.git
+git clone https://github.com/zhucl121/risk-engine.git
 cd riskengine
 
 # 复制并编辑配置文件

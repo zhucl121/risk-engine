@@ -25,7 +25,7 @@ linters:
 
 linters-settings:
   goimports:
-    local-prefixes: github.com/yourorg/riskengine
+    local-prefixes: github.com/zhucl121/risk-engine
   revive:
     rules:
       - name: exported

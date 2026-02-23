@@ -12,8 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/riskengine/internal/rule"
-	"github.com/yourorg/riskengine/pkg/dsl"
+	"github.com/zhucl121/risk-engine/internal/rule"
+	"github.com/zhucl121/risk-engine/pkg/dsl"
 )
 
 // RulesHandler handles all /admin/v1/rules endpoints.

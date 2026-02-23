@@ -13,7 +13,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 type shadowPolicyYAML struct {

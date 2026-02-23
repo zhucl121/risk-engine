@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 // ValueKind is a tag for the Value union, avoiding interface{} boxing in hot paths.

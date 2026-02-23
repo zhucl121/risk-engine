@@ -12,8 +12,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/pkg/dsl/ast"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/pkg/dsl/ast"
 )
 
 // codegenVisitor walks an AST and produces a root evalFn.

@@ -15,7 +15,7 @@ import (
 
 	"github.com/sony/gobreaker"
 
-	"github.com/yourorg/riskengine/internal/metrics"
+	"github.com/zhucl121/risk-engine/internal/metrics"
 )
 
 // Breaker is a named circuit breaker that tracks its state in Prometheus.

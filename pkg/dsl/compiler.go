@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/pkg/dsl/parser"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/pkg/dsl/parser"
 )
 
 // Compile parses and compiles a DSL condition string into a reusable Program.

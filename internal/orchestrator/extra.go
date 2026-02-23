@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/internal/scene"
+	"github.com/zhucl121/risk-engine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/feature"
+	"github.com/zhucl121/risk-engine/internal/scene"
 )
 
 // ExtraFieldType declares the intended type for one Extra key.

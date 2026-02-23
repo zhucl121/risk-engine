@@ -6,7 +6,7 @@ package main
 import (
 	"context"
 
-	"github.com/yourorg/riskengine/internal/rule"
+	"github.com/zhucl121/risk-engine/internal/rule"
 )
 
 // noopRuleEvaluator is a rule.Evaluator that always returns an empty result set.

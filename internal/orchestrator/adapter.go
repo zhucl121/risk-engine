@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/zhucl121/risk-engine/internal/engine"
 )
 
 // RegistryEvaluator wraps a Registry so it satisfies engine.Evaluator.
