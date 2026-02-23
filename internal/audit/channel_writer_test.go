@@ -14,14 +14,13 @@ import (
 	"go.uber.org/zap/zaptest"
 
 	"github.com/yourorg/riskengine/internal/audit"
-	"github.com/yourorg/riskengine/internal/engine"
 )
 
 func newRecord(id string) *audit.Record {
 	return &audit.Record{
 		RequestID: id,
 		SceneCode: "test_scene",
-		Decision:  engine.DecisionPass,
+		Decision:  "PASS",
 		RiskScore: 10,
 		CostMs:    5,
 		CreatedAt: time.Now(),

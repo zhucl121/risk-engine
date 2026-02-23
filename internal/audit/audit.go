@@ -8,26 +8,26 @@ package audit
 import (
 	"context"
 	"time"
-
-	"github.com/yourorg/riskengine/internal/engine"
-	"github.com/yourorg/riskengine/internal/feature"
-	"github.com/yourorg/riskengine/internal/rule"
 )
 
 // Record is an immutable snapshot of a single risk decision.
 // Sensitive fields (user ID, card number) are masked before persistence.
+// All engine/feature/rule types are replaced by primitive equivalents to
+// prevent import cycles (audit ← engine ← orchestrator ← audit).
 type Record struct {
-	RequestID   string
-	SceneCode   string
+	RequestID string
+	SceneCode string
 	// UserID is masked: only last 4 characters visible.
-	UserID      string
-	DeviceID    string
-	Decision    engine.Decision
+	UserID   string
+	DeviceID string
+	// Decision holds the decision string (e.g. "PASS", "REJECT").
+	Decision    string
 	RiskScore   int
-	// Features contains the full feature map with PII fields masked.
-	Features    feature.Map
-	RuleResults []*rule.Result
+	// Features is the masked feature map serialised as map[string]any.
+	Features    map[string]any
 	ModelScores map[string]float64
+	HitRules    []string
+	RiskReasons []string
 	CostMs      int64
 	CreatedAt   time.Time
 }
@@ -59,34 +59,43 @@ func maskUserID(id string) string {
 	return string(masked)
 }
 
-// NewRecord builds an audit Record from a decision, masking PII in the process.
-func NewRecord(req *engine.DecisionRequest, res *engine.DecisionResult, features feature.Map, ruleResults []*rule.Result) *Record {
+// NewRecord builds an audit Record, masking PII in the process.
+// All caller-side types are passed as primitives to avoid import cycles.
+func NewRecord(
+	requestID, sceneCode, userID, deviceID, decision string,
+	riskScore int,
+	features map[string]any,
+	modelScores map[string]float64,
+	hitRules, riskReasons []string,
+	costMs int64,
+) *Record {
 	return &Record{
-		RequestID:   req.RequestID,
-		SceneCode:   req.SceneCode,
-		UserID:      maskUserID(req.UserID),
-		DeviceID:    req.DeviceID,
-		Decision:    res.Decision,
-		RiskScore:   res.RiskScore,
-		Features:    maskPII(features),
-		RuleResults: ruleResults,
-		ModelScores: res.ModelScores,
-		CostMs:      res.CostMs,
+		RequestID:   requestID,
+		SceneCode:   sceneCode,
+		UserID:      maskUserID(userID),
+		DeviceID:    deviceID,
+		Decision:    decision,
+		RiskScore:   riskScore,
+		Features:    maskPIIMap(features),
+		ModelScores: modelScores,
+		HitRules:    hitRules,
+		RiskReasons: riskReasons,
+		CostMs:      costMs,
 		CreatedAt:   time.Now(),
 	}
 }
 
-// maskPII returns a copy of the feature map with known PII keys masked.
-func maskPII(m feature.Map) feature.Map {
+// maskPIIMap returns a copy of the feature map with known PII keys masked.
+func maskPIIMap(m map[string]any) map[string]any {
 	piiKeys := map[string]bool{
 		"user.phone":       true,
 		"user.id_number":   true,
 		"payment.card_num": true,
 	}
-	out := make(feature.Map, len(m))
+	out := make(map[string]any, len(m))
 	for k, v := range m {
 		if piiKeys[k] {
-			out[k] = feature.Value{Kind: feature.KindString, StrVal: "****"}
+			out[k] = "****"
 			continue
 		}
 		out[k] = v
