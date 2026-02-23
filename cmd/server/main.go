@@ -30,6 +30,7 @@ import (
 	"github.com/yourorg/riskengine/internal/feature/fetchers"
 	"github.com/yourorg/riskengine/internal/list"
 	mw "github.com/yourorg/riskengine/internal/middleware"
+	"github.com/yourorg/riskengine/internal/health"
 	"github.com/yourorg/riskengine/internal/model"
 	"github.com/yourorg/riskengine/internal/orchestrator"
 	"github.com/yourorg/riskengine/pkg/dsl"
@@ -117,8 +118,15 @@ func main() {
 	// Prometheus metrics endpoint (not protected by rate-limit or auth).
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
+	// ── Health checker ────────────────────────────────────────────────────────
+	healthChecker := health.NewCompositeChecker(
+		health.NewRedisChecker("redis", redisClient),
+	)
+
 	apiV1 := router.Group("/api/v1")
-	v1.NewHandler(eng, logger).RegisterRoutes(apiV1)
+	v1.NewHandler(eng, logger).
+		WithHealthChecker(healthChecker).
+		RegisterRoutes(apiV1)
 
 	adminGroup := router.Group("/admin/v1")
 	adminv1.NewRulesHandler(nil, dslReg, logger).RegisterRoutes(adminGroup)

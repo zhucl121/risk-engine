@@ -14,23 +14,34 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/yourorg/riskengine/internal/health"
 )
 
 // Handler holds dependencies for the HTTP API handlers.
 type Handler struct {
-	engine engine.Engine
-	logger *zap.Logger
+	engine  engine.Engine
+	checker *health.CompositeChecker
+	logger  *zap.Logger
 }
 
 // NewHandler returns an initialised Handler.
+// checker may be nil; in that case /readyz falls back to engine.Health().
 func NewHandler(e engine.Engine, logger *zap.Logger) *Handler {
 	return &Handler{engine: e, logger: logger}
+}
+
+// WithHealthChecker attaches a CompositeChecker to the handler for /readyz.
+func (h *Handler) WithHealthChecker(c *health.CompositeChecker) *Handler {
+	h.checker = c
+	return h
 }
 
 // RegisterRoutes mounts all v1 routes onto the provided router group.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/decision", h.Evaluate)
-	rg.GET("/health", h.Health)
+	rg.GET("/health", h.Health)   // legacy — engine-level health
+	rg.GET("/livez", h.Livez)     // k8s liveness
+	rg.GET("/readyz", h.Readyz)   // k8s readiness
 }
 
 // decisionRequest is the JSON body for POST /api/v1/decision.
@@ -111,7 +122,7 @@ type healthResponse struct {
 	Components map[string]bool `json:"components,omitempty"`
 }
 
-// Health handles GET /api/v1/health.
+// Health handles GET /api/v1/health (legacy, kept for backward compat).
 func (h *Handler) Health(c *gin.Context) {
 	status := h.engine.Health()
 	code := http.StatusOK
@@ -122,4 +133,31 @@ func (h *Handler) Health(c *gin.Context) {
 		Healthy:    status.Healthy,
 		Components: status.Components,
 	})
+}
+
+// Livez handles GET /api/v1/livez.
+// Always returns 200 while the process is running (Kubernetes liveness probe).
+func (h *Handler) Livez(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// readyzResponse is the JSON response for GET /api/v1/readyz.
+type readyzResponse struct {
+	Ready    bool            `json:"ready"`
+	Checks   []health.Status `json:"checks,omitempty"`
+}
+
+// Readyz handles GET /api/v1/readyz.
+// Returns 200 when all registered dependency checks pass, 503 otherwise.
+func (h *Handler) Readyz(c *gin.Context) {
+	if h.checker == nil {
+		c.JSON(http.StatusOK, readyzResponse{Ready: true})
+		return
+	}
+	statuses, allOK := h.checker.CheckAll(c.Request.Context())
+	code := http.StatusOK
+	if !allOK {
+		code = http.StatusServiceUnavailable
+	}
+	c.JSON(code, readyzResponse{Ready: allOK, Checks: statuses})
 }
