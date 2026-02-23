@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Velocity Fetcher** (`internal/feature/fetchers`): sliding-window Redis counter for payment (1min/1h/24h) and promo (24h) velocity features; fail-open on Redis errors; `Increment()` API for transaction-commit path
+- **Prometheus Metrics** (`internal/metrics`): four golden signals + business indicators — `decision_duration_seconds`, `decisions_total`, `rule_hits_total`, `feature_fetch_errors_total`, `active_requests`, `http_request_duration_seconds`, `rate_limited_total`, `circuit_breaker_state`; `/metrics` endpoint via `promhttp`
+- **Two-tier Rate Limiter** (`internal/middleware.RateLimit`): global (5000 RPS) + per-IP (100 RPS) token-bucket with idle-entry cleanup; HTTP 429 + counter
+- **Health Checks** (`internal/health`): `Checker` interface, `RedisChecker`, `FuncChecker`, `CompositeChecker`; `/api/v1/livez` (always 200) and `/api/v1/readyz` (503 on dependency failure) for Kubernetes probes
+- **gRPC DecisionService** (`api/grpc/server`, `api/grpc/v1`): proto-generated stubs + `DecisionServer` implementing `Evaluate`, `BatchEvaluate`, `Health`; started alongside HTTP server with `GracefulStop`
+- **A/B Test Traffic Splitting** (`internal/orchestrator`): `ABTestConfig.ExperimentPipeline`; `rand`-based bucket assignment; experiment group tagged with `abtest:{experimentID}` in `RiskReasons`; YAML `abTest` block parsed in registry loader
+- **Circuit Breaker** (`internal/resilience`): `gobreaker`-backed `Breaker.Execute(ctx, fn)`; state changes recorded in `circuit_breaker_state` gauge; wired into `dispatchModel` and `dispatchList` in pipeline
+- **Policy YAML Loading Fix** (`internal/orchestrator.LoadFromReader`): multi-document YAML (`---` separator) support; `loadPolicies()` in `main.go` delegates to `LoadFromYAML()` per file; `configs/policies/payment.yaml` example
+
+### Changed
+- `ABTestConfig` gained `ExperimentPipeline []Step` field for alternative step sequence
+- `Handler.WithHealthChecker()` fluent option wires `CompositeChecker` to `/readyz`
+- `orchestrator.Deps` gained `Breakers map[string]*resilience.Breaker` for per-step circuit breakers
+- `go.mod` upgraded: `golang.org/x/time`, `google.golang.org/grpc`, added `github.com/sony/gobreaker`, `github.com/prometheus/client_golang`
+
+
 - Self-hosted RiskDSL expression engine (`pkg/dsl`) built on ANTLR4-Go 4.13.2
   - Grammar file `pkg/dsl/grammar/RiskDSL.g4` (reproduced via `go generate`)
   - ANTLR4 ParseTree → custom AST → Go closure tree (zero-alloc hot path)
