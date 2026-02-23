@@ -89,22 +89,43 @@ func (r *atomicRegistry) LoadFromYAML(ctx context.Context, path string) error {
 	return r.LoadFromReader(ctx, f)
 }
 
-// LoadFromReader reads YAML-encoded policy definitions from r and reloads.
+// LoadFromReader reads YAML-encoded policy definitions from rd and reloads.
+//
+// Supports two formats:
+//  1. A YAML sequence of PolicySet objects (single document, list root).
+//  2. Multiple YAML documents separated by "---", each being a single PolicySet
+//     or a sequence of PolicySets.
 func (r *atomicRegistry) LoadFromReader(ctx context.Context, rd io.Reader) error {
-	var raw []policySetYAML
-	if err := yaml.NewDecoder(rd).Decode(&raw); err != nil {
-		return fmt.Errorf("orchestrator: decode yaml: %w", err)
-	}
+	dec := yaml.NewDecoder(rd)
+	var all []PolicySet
 
-	policies := make([]PolicySet, 0, len(raw))
-	for _, y := range raw {
-		ps, err := convertPolicy(y)
-		if err != nil {
-			return err
+	for {
+		// Try decoding as a sequence first.
+		var raw []policySetYAML
+		err := dec.Decode(&raw)
+		if err == io.EOF {
+			break
 		}
-		policies = append(policies, ps)
+		if err != nil {
+			// Maybe it's a single object, not a list.
+			var single policySetYAML
+			if err2 := dec.Decode(&single); err2 != nil {
+				return fmt.Errorf("orchestrator: decode yaml: %w", err)
+			}
+			raw = []policySetYAML{single}
+		}
+		for _, y := range raw {
+			if y.SceneCode == "" {
+				continue // skip empty documents
+			}
+			ps, err := convertPolicy(y)
+			if err != nil {
+				return err
+			}
+			all = append(all, ps)
+		}
 	}
-	return r.Reload(ctx, policies)
+	return r.Reload(ctx, all)
 }
 
 func convertPolicy(y policySetYAML) (PolicySet, error) {

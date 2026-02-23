@@ -1,0 +1,57 @@
+# Payment scene risk policy
+# Format: a YAML list of PolicySet; multiple docs separated by --- are also supported.
+- sceneCode: payment
+  version: "1.0.0"
+  fallback: MANUAL_REVIEW
+  pipeline:
+    - name: blacklist_check
+      kind: LIST
+      timeoutMs: 20
+      onFailure: SKIP
+    - name: payment_rules
+      kind: RULE
+      ruleGroup: payment
+      timeoutMs: 50
+      onFailure: SKIP
+    - name: risk_model
+      kind: MODEL
+      models:
+        - payment_fraud_v2
+      timeoutMs: 80
+      onFailure: SKIP
+      strategy: HIGHEST_RISK
+  abTest:
+    enabled: false
+    experimentId: payment-model-v3
+    splitPct: 0.05
+    experimentPipeline:
+      - name: blacklist_check
+        kind: LIST
+        timeoutMs: 20
+        onFailure: SKIP
+      - name: payment_rules
+        kind: RULE
+        ruleGroup: payment
+        timeoutMs: 50
+        onFailure: SKIP
+      - name: risk_model_v3
+        kind: MODEL
+        models:
+          - payment_fraud_v3
+        timeoutMs: 80
+        onFailure: SKIP
+        strategy: HIGHEST_RISK
+
+- sceneCode: login
+  version: "1.0.0"
+  fallback: PASS
+  pipeline:
+    - name: device_blacklist
+      kind: LIST
+      timeoutMs: 20
+      onFailure: SKIP
+    - name: login_rules
+      kind: RULE
+      ruleGroup: login
+      timeoutMs: 50
+      onFailure: SKIP

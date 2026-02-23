@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -208,8 +209,15 @@ func newRedisClient(cfg config.RedisConfig) redis.UniversalClient {
 	})
 }
 
-// loadPolicies walks policyDir and loads all *.yaml files into the registry.
-// Missing directory is silently tolerated.
+// yamlLoader is the subset of Registry needed by loadPolicies.
+type yamlLoader interface {
+	LoadFromYAML(ctx context.Context, path string) error
+}
+
+// loadPolicies walks policyDir and loads all *.yaml / *.yml files into the registry.
+// Missing directory is silently tolerated (optional at startup).
+// Each file may contain a single PolicySet, a YAML list of PolicySets, or
+// multiple documents separated by "---".
 func loadPolicies(ctx context.Context, reg orchestrator.Registry, policyDir string, logger *zap.Logger) error {
 	entries, err := os.ReadDir(policyDir)
 	if err != nil {
@@ -218,20 +226,24 @@ func loadPolicies(ctx context.Context, reg orchestrator.Registry, policyDir stri
 		}
 		return err
 	}
-	var policies []orchestrator.PolicySet
+	loader, ok := reg.(yamlLoader)
+	if !ok {
+		return fmt.Errorf("loadPolicies: registry does not implement LoadFromYAML")
+	}
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		name := e.Name()
-		if len(name) < 5 || name[len(name)-5:] != ".yaml" {
+		isYAML := len(name) >= 5 && (name[len(name)-5:] == ".yaml" || (len(name) >= 4 && name[len(name)-4:] == ".yml"))
+		if !isYAML {
 			continue
 		}
 		path := policyDir + "/" + name
 		logger.Info("loading policy file", zap.String("path", path))
-		// We use a reader-based approach to support both single-doc and
-		// multi-doc YAML files (each document = one PolicySet).
-		_ = path // policy loading via registry is done in Reload below
+		if err := loader.LoadFromYAML(ctx, path); err != nil {
+			return fmt.Errorf("loadPolicies: %s: %w", path, err)
+		}
 	}
-	return reg.Reload(ctx, policies)
+	return nil
 }
