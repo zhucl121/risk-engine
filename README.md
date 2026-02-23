@@ -18,8 +18,11 @@
 - **Hot-reload**: Rules and models update without service restart; change propagates in < 30 seconds
 - **Self-hosted RiskDSL**: Custom ANTLR4-Go expression language compiled to Go closures at load time; P99 29ns (simple), 97ns (with features), 0 allocs per evaluation
 - **Parallel feature fetching**: All feature sources queried concurrently; per-source timeout degradation never blocks the decision
+- **Standalone Feature Store**: Optional external feature service called over gRPC; supports `VelocityGroup` (sliding-window counters) and `UserProfileGroup` (Redis JSON hash); fail-open on timeout
 - **Velocity counters**: Redis Lua atomic sliding-window counters at any granularity (1min / 1hour / 24h); backed by `pkg/sliding`
 - **List service**: Redis-backed blacklist / graylist / whitelist with O(1) lookup
+- **Extra parameter spec management**: Per-scene Extra field rules stored in MySQL — mark fields as required (missing → request rejected) or optional with a default value; hot-reloaded every 30 s with a background watcher
+- **Extra → feature injection**: `DecisionRequest.Extra` fields are automatically injected into `feature.Map` as `extra.<key>` with DB-driven type coercion (string / int / float / bool); per-step `ParamMapping` remaps fields for downstream services
 - **A/B testing**: Traffic-split routing per `PolicySet.ABTest`; experiment group tagged in `RiskReasons`; no restart required
 - **Circuit breaker**: `gobreaker`-backed per-step breakers (list, model); state exposed as Prometheus gauge
 - **Rate limiting**: Two-tier token bucket — global (5000 RPS) + per-IP (100 RPS); HTTP 429 on exhaustion
@@ -153,6 +156,62 @@ See [docs/adding-rules.md](docs/adding-rules.md) for a step-by-step walkthrough.
 
 See `internal/feature/fetchers/velocity_fetcher.go` as a reference implementation.
 
+### Use the standalone Feature Store
+
+Enable in `configs/config.yaml`:
+
+```yaml
+feature_store:
+  enabled: true
+  addr: "localhost:50052"
+  dial_timeout: 3s
+  request_timeout: 50ms
+  groups:
+    - name: velocity      # must match a registered FeatureGroup name
+      timeout: 20ms
+    - name: user_profile
+      timeout: 30ms
+```
+
+Start the Feature Store server:
+
+```bash
+go run ./cmd/featurestore -config configs/config.yaml
+```
+
+Implement a custom `FeatureGroup` by satisfying `store.FeatureGroup` and registering it with `store.DefaultRegistry`.
+
+### Configure Extra parameter specs (database)
+
+Each scene's `Extra` fields can be declared in the `scene_extra_params` table (run `configs/migrations/002_create_scene_extra_params.sql` first).
+Use the admin API to manage specs at runtime:
+
+```bash
+# List specs for a scene
+GET /admin/v1/scenes/payment/extra-params
+
+# Create / update a spec
+POST /admin/v1/scenes/payment/extra-params
+{
+  "param_key":   "merchant_id",
+  "param_type":  "string",
+  "required":    true,
+  "description": "Merchant identifier — required"
+}
+
+# Optional field with a default value
+POST /admin/v1/scenes/payment/extra-params
+{
+  "param_key":   "product_type",
+  "param_type":  "string",
+  "required":    false,
+  "default_val": "GOODS",
+  "description": "Product category, defaults to GOODS"
+}
+```
+
+When a required field is absent the engine returns `ErrMissingRequiredExtra` (HTTP 400). When an optional field is absent its `default_val` is filled in before type-coercion and feature injection.
+
 ### Add an ML model
 
 1. Export your model to ONNX format
@@ -186,15 +245,20 @@ make bench
 
 ```
 riskengine/
-├── cmd/server/            # Application entry point (main.go)
+├── cmd/
+│   ├── server/            # Main HTTP + gRPC server entry point
+│   └── featurestore/      # Standalone Feature Store gRPC server
 ├── internal/              # Private application code
 │   ├── engine/            # Top-level DecisionEngine, request lifecycle
 │   ├── rule/              # Rule storage, evaluator, hot-reload
 │   ├── feature/           # Parallel feature fetching
 │   │   └── fetchers/      # Concrete fetchers (VelocityFetcher, ...)
+│   ├── featurestore/      # gRPC Feature Store client, fetcher adapter, server impl
+│   │   └── store/         # FeatureGroup registry (VelocityGroup, UserProfileGroup)
 │   ├── model/             # Model registry, ONNX scorer interface
 │   ├── list/              # Redis-backed list service (blacklist/graylist)
-│   ├── orchestrator/      # DAG executor, A/B routing, policy registry
+│   ├── orchestrator/      # DAG executor, A/B routing, policy registry, Extra injection
+│   ├── scene/             # Per-scene Extra param specs (DB-backed, hot-reloaded)
 │   ├── audit/             # Async channel audit writer (→ log / Kafka)
 │   ├── metrics/           # Prometheus collectors
 │   ├── middleware/         # Gin middleware (RequestID, Metrics, RateLimit, Logger, Tracing)
@@ -220,6 +284,7 @@ riskengine/
 │       └── admin/v1/      # Rule management CRUD API
 ├── configs/
 │   ├── config.example.yaml
+│   ├── migrations/        # Database migration scripts (SQL)
 │   └── policies/          # PolicySet YAML files (loaded at startup)
 ├── deployments/           # Docker and Kubernetes manifests
 ├── docs/                  # Architecture docs, design documents

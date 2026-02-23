@@ -20,8 +20,11 @@
 | **热更新** | 规则和模型无需重启即可生效，变更在 30 秒内传播完毕 |
 | **自研 RiskDSL** | 基于 ANTLR4-Go 的表达式语言，加载时编译为 Go 闭包；P99 29ns（简单条件）/ 97ns（含特征读取），零堆分配 |
 | **并行特征拉取** | 所有特征源并发查询，单源超时降级，绝不阻塞决策主路径 |
+| **独立 Feature Store** | 可选的外部特征服务，通过 gRPC 调用；内置 `VelocityGroup`（滑动窗口计数）和 `UserProfileGroup`（Redis JSON Hash）；超时时自动 fail-open |
 | **速率计数器** | Redis Lua 原子滑动窗口计数，支持任意时间粒度（1分钟 / 1小时 / 24小时） |
 | **名单服务** | Redis 黑名单 / 灰名单 / 白名单，O(1) 查询 |
+| **Extra 参数规格管理** | 每个场景的 Extra 字段规格存储于 MySQL，支持必需校验（缺失则拒绝请求）和可选默认值填充；后台每 30s 热重载 |
+| **Extra → 特征注入** | `DecisionRequest.Extra` 字段自动注入 `feature.Map`（key 为 `extra.<字段名>`），类型由 DB 规格驱动（string/int/float/bool）；步骤级 `ParamMapping` 支持向下游服务映射任意字段 |
 | **A/B 测试** | 按 `PolicySet.ABTest` 配置流量分流，实验组结果标记在 `RiskReasons` 中，无需重启 |
 | **熔断器** | 基于 `gobreaker` 的按步骤熔断（名单、模型），状态通过 Prometheus Gauge 暴露 |
 | **限流** | 两级令牌桶：全局 5000 RPS + 单 IP 100 RPS，超限返回 HTTP 429 |
@@ -381,6 +384,58 @@ featureSvc.Register(fetchers.NewMyFetcher(deps))
 
 参考实现：`internal/feature/fetchers/velocity_fetcher.go`
 
+### 配置 Extra 参数规格（数据库）
+
+先执行迁移脚本：
+
+```bash
+mysql -u root riskengine < configs/migrations/002_create_scene_extra_params.sql
+```
+
+通过管理 API 维护规格：
+
+```bash
+# 查询场景的 Extra 参数规格
+GET /admin/v1/scenes/payment/extra-params
+
+# 新增必需字段
+POST /admin/v1/scenes/payment/extra-params
+{
+  "param_key":   "merchant_id",
+  "param_type":  "string",
+  "required":    true,
+  "description": "商户 ID，必填"
+}
+
+# 新增可选字段（带默认值）
+POST /admin/v1/scenes/payment/extra-params
+{
+  "param_key":   "product_type",
+  "param_type":  "string",
+  "required":    false,
+  "default_val": "GOODS",
+  "description": "商品类型，默认 GOODS"
+}
+
+# 更新字段
+PUT /admin/v1/scenes/payment/extra-params/product_type
+{ "default_val": "DIGITAL" }
+
+# 软删除字段
+DELETE /admin/v1/scenes/payment/extra-params/product_type
+```
+
+**运行时行为：**
+
+| 场景 | 行为 |
+|------|------|
+| 必需字段缺失 | 返回 `ErrMissingRequiredExtra`（HTTP 400），包含字段名和场景码 |
+| 可选字段缺失且有默认值 | 自动填充 `default_val`，再做类型转换注入 `feature.Map` |
+| 可选字段缺失且无默认值 | 不注入，规则引用 `extra.<key>` 得到零值 |
+| 字段已存在 | 直接做类型转换，跳过默认值填充 |
+
+DB 规格与 YAML 静态 `ExtraSchema` 合并，**DB 优先**。规格缓存在内存中，后台每 30s 增量热重载。
+
 ### 添加 ML 模型
 
 1. 将模型导出为 ONNX 格式
@@ -432,15 +487,20 @@ make bench
 
 ```
 riskengine/
-├── cmd/server/            # 应用入口（main.go）
+├── cmd/
+│   ├── server/            # 主 HTTP + gRPC 服务入口
+│   └── featurestore/      # 独立 Feature Store gRPC 服务入口
 ├── internal/              # 私有业务代码
 │   ├── engine/            # 顶层 DecisionEngine，请求生命周期
 │   ├── rule/              # 规则存储、评估器、热更新
 │   ├── feature/           # 并行特征拉取
 │   │   └── fetchers/      # 具体拉取器（VelocityFetcher 等）
+│   ├── featurestore/      # gRPC Feature Store 客户端、Fetcher 适配器、Server 实现
+│   │   └── store/         # FeatureGroup 注册表（VelocityGroup / UserProfileGroup）
 │   ├── model/             # 模型注册表、ONNX 评分接口
 │   ├── list/              # Redis 名单服务（黑名单 / 灰名单）
-│   ├── orchestrator/      # DAG 执行器、A/B 路由、策略注册表
+│   ├── orchestrator/      # DAG 执行器、A/B 路由、策略注册表、Extra 注入
+│   ├── scene/             # 场景级 Extra 参数规格（DB 持久化，带热重载）
 │   ├── audit/             # 异步 channel 审计写入（→ 日志 / Kafka）
 │   ├── metrics/           # Prometheus 指标定义
 │   ├── middleware/        # Gin 中间件（RequestID / Metrics / RateLimit / Logger / Tracing）
@@ -463,9 +523,10 @@ riskengine/
 │   │   └── server/        # DecisionServer 实现
 │   └── http/              # Gin HTTP Handler
 │       ├── v1/            # 决策 API / 健康检查 / livez / readyz
-│       └── admin/v1/      # 规则管理 CRUD API
+│       └── admin/v1/      # 规则管理 CRUD API + Extra 参数规格管理 API
 ├── configs/
 │   ├── config.example.yaml
+│   ├── migrations/        # 数据库迁移脚本（SQL）
 │   └── policies/          # PolicySet YAML 文件（启动时自动加载）
 ├── deployments/           # Docker 和 Kubernetes 部署清单
 ├── docs/                  # 架构文档、设计方案
