@@ -19,19 +19,21 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	adminv1 "github.com/yourorg/riskengine/api/http/admin/v1"
 	v1 "github.com/yourorg/riskengine/api/http/v1"
 	"github.com/yourorg/riskengine/internal/audit"
 	"github.com/yourorg/riskengine/internal/config"
 	"github.com/yourorg/riskengine/internal/engine"
 	"github.com/yourorg/riskengine/internal/feature"
+	"github.com/yourorg/riskengine/internal/feature/fetchers"
 	"github.com/yourorg/riskengine/internal/list"
 	mw "github.com/yourorg/riskengine/internal/middleware"
 	"github.com/yourorg/riskengine/internal/model"
 	"github.com/yourorg/riskengine/internal/orchestrator"
 	"github.com/yourorg/riskengine/pkg/dsl"
 	"github.com/yourorg/riskengine/pkg/dsl/builtins"
-	"github.com/yourorg/riskengine/internal/feature/fetchers"
 	"github.com/yourorg/riskengine/pkg/sliding"
 )
 
@@ -105,10 +107,14 @@ func main() {
 	router := gin.New()
 	router.Use(
 		mw.RequestID(),
+		mw.Metrics(),
 		mw.Logger(logger),
 		mw.Recovery(logger),
 		mw.Tracing(),
 	)
+
+	// Prometheus metrics endpoint (not protected by rate-limit or auth).
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	apiV1 := router.Group("/api/v1")
 	v1.NewHandler(eng, logger).RegisterRoutes(apiV1)
