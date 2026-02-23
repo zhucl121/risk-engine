@@ -6,26 +6,17 @@ package main
 import (
 	"context"
 
-	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/yourorg/riskengine/internal/rule"
 )
 
-// stubEngine is a minimal Engine implementation used during initial bringup.
-// Replace with the real wired engine before production use.
-type stubEngine struct{}
+// noopRuleEvaluator is a rule.Evaluator that always returns an empty result set.
+// It is used as a placeholder when no rules are loaded at startup.
+type noopRuleEvaluator struct{}
 
-func newStubEngine() engine.Engine { return &stubEngine{} }
+func newNoopRuleEvaluator() rule.Evaluator { return &noopRuleEvaluator{} }
 
-func (s *stubEngine) Evaluate(_ context.Context, req *engine.DecisionRequest) (*engine.DecisionResult, error) {
-	return &engine.DecisionResult{
-		RequestID: req.RequestID,
-		Decision:  engine.DecisionPass,
-		RiskScore: 0,
-		RiskLevel: engine.RiskLevelLow,
-	}, nil
+func (n *noopRuleEvaluator) Evaluate(_ context.Context, _ *rule.Context) ([]*rule.Result, error) {
+	return nil, nil
 }
 
-func (s *stubEngine) Reload(_ context.Context) error { return nil }
-
-func (s *stubEngine) Health() engine.HealthStatus {
-	return engine.HealthStatus{Healthy: true, Components: map[string]bool{"stub": true}}
-}
+func (n *noopRuleEvaluator) Reload(_ []rule.Rule) error { return nil }
