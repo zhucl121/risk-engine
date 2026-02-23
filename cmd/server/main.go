@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,9 +19,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	grpcserver "github.com/yourorg/riskengine/api/grpc/server"
+	riskv1 "github.com/yourorg/riskengine/api/grpc/v1"
 	adminv1 "github.com/yourorg/riskengine/api/http/admin/v1"
 	v1 "github.com/yourorg/riskengine/api/http/v1"
 	"github.com/yourorg/riskengine/internal/audit"
@@ -139,7 +143,21 @@ func main() {
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
 
-	// ── Start server ──────────────────────────────────────────────────────────
+	// ── gRPC server ───────────────────────────────────────────────────────────
+	grpcSrv := grpc.NewServer()
+	riskv1.RegisterDecisionServiceServer(grpcSrv, grpcserver.NewDecisionServer(eng, logger))
+	go func() {
+		lis, err := net.Listen("tcp", cfg.Server.GRPCAddr)
+		if err != nil {
+			logger.Fatal("grpc listen failed", zap.String("addr", cfg.Server.GRPCAddr), zap.Error(err))
+		}
+		logger.Info("grpc server listening", zap.String("addr", cfg.Server.GRPCAddr))
+		if err := grpcSrv.Serve(lis); err != nil {
+			logger.Error("grpc server error", zap.Error(err))
+		}
+	}()
+
+	// ── Start HTTP server ─────────────────────────────────────────────────────
 	go func() {
 		logger.Info("http server listening", zap.String("addr", cfg.Server.Addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -159,6 +177,7 @@ func main() {
 	if err := srv.Shutdown(drainCtx); err != nil {
 		logger.Error("graceful shutdown failed", zap.Error(err))
 	}
+	grpcSrv.GracefulStop()
 
 	flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer flushCancel()
