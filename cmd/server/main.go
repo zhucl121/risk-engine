@@ -31,6 +31,8 @@ import (
 	"github.com/yourorg/riskengine/internal/orchestrator"
 	"github.com/yourorg/riskengine/pkg/dsl"
 	"github.com/yourorg/riskengine/pkg/dsl/builtins"
+	"github.com/yourorg/riskengine/internal/feature/fetchers"
+	"github.com/yourorg/riskengine/pkg/sliding"
 )
 
 // Version is injected at build time via -ldflags.
@@ -58,8 +60,15 @@ func main() {
 
 	// ── Feature service ───────────────────────────────────────────────────────
 	featureSvc := feature.NewService(logger)
-	// Register feature fetchers here (e.g. velocity, user profile, device).
-	// Example: featureSvc.Register(velocity.NewFetcher(redisClient, cfg.Feature))
+
+	// Register velocity fetchers backed by the shared Redis sliding window.
+	slidingWin := sliding.New(redisClient)
+	featureSvc.Register(fetchers.NewPaymentVelocityFetcher(slidingWin,
+		fetchers.WithTimeout(cfg.Feature.RedisTimeout),
+	))
+	featureSvc.Register(fetchers.NewPromoVelocityFetcher(slidingWin,
+		fetchers.WithTimeout(cfg.Feature.RedisTimeout),
+	))
 
 	// ── Model registry ────────────────────────────────────────────────────────
 	modelReg := model.NewRegistry()
