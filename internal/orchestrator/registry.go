@@ -18,10 +18,18 @@ import (
 
 // policySetYAML mirrors PolicySet for YAML unmarshalling.
 type policySetYAML struct {
-	SceneCode string     `yaml:"sceneCode"`
-	Version   string     `yaml:"version"`
-	Fallback  string     `yaml:"fallback"`
-	Pipeline  []stepYAML `yaml:"pipeline"`
+	SceneCode string       `yaml:"sceneCode"`
+	Version   string       `yaml:"version"`
+	Fallback  string       `yaml:"fallback"`
+	Pipeline  []stepYAML   `yaml:"pipeline"`
+	ABTest    *abTestYAML  `yaml:"abTest"`
+}
+
+type abTestYAML struct {
+	Enabled            bool       `yaml:"enabled"`
+	ExperimentID       string     `yaml:"experimentId"`
+	SplitPct           float64    `yaml:"splitPct"`
+	ExperimentPipeline []stepYAML `yaml:"experimentPipeline"`
 }
 
 type stepYAML struct {
@@ -109,11 +117,31 @@ func convertPolicy(y policySetYAML) (PolicySet, error) {
 		steps = append(steps, s)
 	}
 	fallback := parseFallback(y.Fallback)
+
+	var abTest *ABTestConfig
+	if y.ABTest != nil && y.ABTest.Enabled {
+		expSteps := make([]Step, 0, len(y.ABTest.ExperimentPipeline))
+		for _, sy := range y.ABTest.ExperimentPipeline {
+			s, err := convertStep(sy)
+			if err != nil {
+				return PolicySet{}, fmt.Errorf("orchestrator: scene %s abtest: %w", y.SceneCode, err)
+			}
+			expSteps = append(expSteps, s)
+		}
+		abTest = &ABTestConfig{
+			Enabled:            y.ABTest.Enabled,
+			ExperimentID:       y.ABTest.ExperimentID,
+			SplitPct:           y.ABTest.SplitPct,
+			ExperimentPipeline: expSteps,
+		}
+	}
+
 	return PolicySet{
 		SceneCode: y.SceneCode,
 		Version:   y.Version,
 		Pipeline:  steps,
 		Fallback:  fallback,
+		ABTest:    abTest,
 	}, nil
 }
 

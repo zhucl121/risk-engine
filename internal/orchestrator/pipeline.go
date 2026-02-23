@@ -6,6 +6,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -38,6 +39,13 @@ func newPipeline(policy PolicySet, deps Deps) Pipeline {
 
 // Execute runs the PolicySet's DAG and returns a merged DecisionResult.
 //
+// A/B test routing:
+//   - When ABTest.Enabled is true, a random draw determines whether this
+//     request is in the experiment group (probability = ABTest.SplitPct).
+//   - Experiment-group requests use ABTest.ExperimentPipeline (if set).
+//   - The experiment group label "abtest:{experimentID}" is appended to
+//     RiskReasons so callers can identify the bucket.
+//
 // Execution model:
 //   - Consecutive non-parallel steps run sequentially.
 //   - A contiguous run of steps marked Parallel=true is executed with errgroup.
@@ -56,7 +64,14 @@ func (p *pipeline) Execute(ctx context.Context, req *engine.DecisionRequest) (*e
 		return nil, fmt.Errorf("orchestrator: feature fetch: %w", err)
 	}
 
+	// ── A/B test routing ──────────────────────────────────────────────────────
 	steps := p.policy.Pipeline
+	if ab := p.policy.ABTest; ab != nil && ab.Enabled && rand.Float64() < ab.SplitPct { //nolint:gosec
+		res.RiskReasons = append(res.RiskReasons, "abtest:"+ab.ExperimentID)
+		if len(ab.ExperimentPipeline) > 0 {
+			steps = ab.ExperimentPipeline
+		}
+	}
 	i := 0
 	for i < len(steps) {
 		step := steps[i]

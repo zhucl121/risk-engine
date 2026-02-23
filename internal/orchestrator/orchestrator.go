@@ -75,6 +75,9 @@ type ABTestConfig struct {
 	ExperimentID string
 	// SplitPct is the fraction of traffic routed to the experiment (0.0–1.0).
 	SplitPct float64
+	// ExperimentPipeline is the alternative step sequence for the experiment group.
+	// If empty, the control Pipeline is reused (useful for testing config changes).
+	ExperimentPipeline []Step
 }
 
 // StepResult captures the outcome of one pipeline step.
