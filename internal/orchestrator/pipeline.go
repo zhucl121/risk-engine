@@ -17,6 +17,7 @@ import (
 	"github.com/yourorg/riskengine/internal/model"
 	"github.com/yourorg/riskengine/internal/resilience"
 	"github.com/yourorg/riskengine/internal/rule"
+	"github.com/yourorg/riskengine/internal/scene"
 )
 
 // Deps bundles all service dependencies the pipeline dispatches to.
@@ -28,6 +29,11 @@ type Deps struct {
 	// Breakers maps step-name → Breaker. Nil entries are treated as no breaker.
 	// Keys: "list", "model" (matches StepKindList / StepKindModel lower-case).
 	Breakers map[string]*resilience.Breaker
+
+	// ExtraParamLoader loads the parameter specification for a scene's Extra
+	// fields from the database.  When nil, only the static PolicySet.ExtraSchema
+	// is used.
+	ExtraParamLoader *scene.ExtraParamLoader
 }
 
 // pipeline is the concrete Pipeline implementation.
@@ -68,10 +74,27 @@ func (p *pipeline) Execute(ctx context.Context, req *engine.DecisionRequest) (*e
 		return nil, fmt.Errorf("orchestrator: feature fetch: %w", err)
 	}
 
+	// ── Validate + fill Extra from DB specs ───────────────────────────────────
+	// Load per-scene parameter specs from DB (with hot-cache). On success,
+	// required fields are validated and optional fields are filled with
+	// defaults. The DB schema is then merged with the static YAML schema,
+	// with DB entries taking precedence, before type-coercing injection.
+	effectiveSchema := p.policy.ExtraSchema
+	if p.deps.ExtraParamLoader != nil {
+		specs, loadErr := p.deps.ExtraParamLoader.Load(ctx, p.policy.SceneCode)
+		if loadErr == nil && len(specs) > 0 {
+			if valErr := validateAndFillExtra(req, specs, p.policy.SceneCode); valErr != nil {
+				return nil, valErr
+			}
+			dbSchema := specsToSchema(specs)
+			effectiveSchema = mergeSchemas(p.policy.ExtraSchema, dbSchema)
+		}
+	}
+
 	// ── Inject Extra fields into the feature map ───────────────────────────────
 	// After injection, DSL rules can reference "extra.<key>" directly.
-	// Type coercion is governed by PolicySet.ExtraSchema.
-	injectExtra(req, p.policy.ExtraSchema, features)
+	// Type coercion is governed by the merged effectiveSchema.
+	injectExtra(req, effectiveSchema, features)
 
 	// ── A/B test routing ──────────────────────────────────────────────────────
 	steps := p.policy.Pipeline

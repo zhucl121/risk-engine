@@ -40,6 +40,7 @@ import (
 	"github.com/yourorg/riskengine/internal/model"
 	"github.com/yourorg/riskengine/internal/orchestrator"
 	"github.com/yourorg/riskengine/internal/resilience"
+	"github.com/yourorg/riskengine/internal/scene"
 	"github.com/yourorg/riskengine/pkg/dsl"
 	"github.com/yourorg/riskengine/pkg/dsl/builtins"
 	"github.com/yourorg/riskengine/pkg/sliding"
@@ -84,6 +85,22 @@ func main() {
 	modelReg := model.NewRegistry()
 	// Register ML scorers here: modelReg.Register("fraud_v1", onnx.NewScorer(...))
 
+	// ── Extra param loader (DB-backed) ────────────────────────────────────────
+	// When a real *sql.DB is wired, replace nil with scene.NewMySQLRepository(db).
+	// For now we create the loader with a nil repo; Load() will be skipped in
+	// pipeline.Execute when the loader is nil (see pipeline.go guard).
+	//
+	// To enable: uncomment the following two lines and supply a *sql.DB:
+	//
+	//   extraParamRepo := scene.NewMySQLRepository(db)
+	//   extraLoader := scene.NewExtraParamLoader(extraParamRepo, cfg.Engine.ReloadInterval, logger)
+	//   extraLoader.StartWatcher(shutdownCtx)
+	//
+	// Then pass extraLoader to deps.ExtraParamLoader below.
+	var extraParamRepo scene.ExtraParamRepository  // nil → no-op
+	var extraLoader *scene.ExtraParamLoader        // nil → skipped in pipeline
+	_ = extraParamRepo                             // suppress unused warning
+
 	// ── Orchestrator registry ─────────────────────────────────────────────────
 	breakerCfg := resilience.DefaultBreakerConfig()
 	deps := orchestrator.Deps{
@@ -95,6 +112,7 @@ func main() {
 			"list":  resilience.New("list", breakerCfg),
 			"model": resilience.New("model", breakerCfg),
 		},
+		ExtraParamLoader: extraLoader,
 	}
 	orchReg := orchestrator.NewRegistry(deps)
 	// Load policy sets from YAML files. Silently skip if directory is missing
@@ -171,6 +189,7 @@ func main() {
 
 	adminGroup := router.Group("/admin/v1")
 	adminv1.NewRulesHandler(nil, dslReg, logger).RegisterRoutes(adminGroup)
+	adminv1.NewExtraParamsHandler(extraParamRepo, extraLoader, logger).Register(adminGroup)
 
 	srv := &http.Server{
 		Addr:         cfg.Server.Addr,
