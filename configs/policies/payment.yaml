@@ -1,18 +1,47 @@
 # Payment scene risk policy
 # Format: a YAML list of PolicySet; multiple docs separated by --- are also supported.
 - sceneCode: payment
-  version: "1.0.0"
+  version: "1.1.0"
   fallback: MANUAL_REVIEW
+
+  # ExtraSchema declares the intended type for each DecisionRequest.Extra key.
+  # Declared keys are automatically type-coerced and injected into the feature
+  # map as "extra.<key>" before any step runs.
+  # Supported types: string (default), int, float, bool
+  extraSchema:
+    merchant_id:   string
+    product_type:  string
+    amount_usd:    float    # "9.99" → 9.99 in feature map
+    is_recurring:  bool     # "true" → true in feature map
+    order_count:   int      # "5"    → 5   in feature map
+
   pipeline:
     - name: blacklist_check
       kind: LIST
       timeoutMs: 20
       onFailure: SKIP
+      # listQueryFields: override which entities to check.
+      # Supports: "request.user_id", "request.device_id", "request.ip",
+      #           "extra.<key>", "feature.<key>", or any literal string.
+      # Default (when omitted): user_id / device_id / ip triple.
+      listQueryFields:
+        - "request.user_id"
+        - "request.device_id"
+        - "request.ip"
+        - "extra.merchant_id"     # also check merchant-level blacklist
+
     - name: payment_rules
       kind: RULE
       ruleGroup: payment
       timeoutMs: 50
       onFailure: SKIP
+      # params: inject renamed or computed values into the feature map
+      # that this step's rules can reference.
+      params:
+        merchant_id:  "extra.merchant_id"   # DSL: extra.merchant_id == "M001"
+        is_recurring: "extra.is_recurring"  # DSL: is_recurring == true
+        channel:      "WEB"                 # literal constant
+
     - name: risk_model
       kind: MODEL
       models:
@@ -20,6 +49,12 @@
       timeoutMs: 80
       onFailure: SKIP
       strategy: HIGHEST_RISK
+      # params: remap feature values to the exact input keys the model expects.
+      params:
+        amount_usd:    "extra.amount_usd"
+        order_count:   "extra.order_count"
+        user_days:     "feature.user.register_days"
+        credit_score:  "feature.user.credit_score"
   abTest:
     enabled: false
     experimentId: payment-model-v3

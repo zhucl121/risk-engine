@@ -56,6 +56,20 @@ type Step struct {
 	// OnFailure defines behaviour when this step errors or times out.
 	OnFailure FailurePolicy
 	Strategy  AggregationStrategy // used only for StepKindAggregate
+
+	// ParamMapping controls how downstream input parameters are populated
+	// for this step.  Keys are the downstream parameter names; values are
+	// source expressions (see mapping.go for the resolution rules).
+	//
+	// Example: {"merchant_id": "extra.merchant_id", "channel": "WEB"}
+	ParamMapping ParamMapping
+
+	// ListQueryFields overrides the default list-check fields for StepKindList.
+	// Each entry is a source expression (same syntax as ParamMapping values).
+	// If empty, the default {user, device, ip} triple is used.
+	//
+	// Example: ["extra.merchant_id", "request.ip"]
+	ListQueryFields []string
 }
 
 // PolicySet is the complete configuration for one business scene.
@@ -67,6 +81,12 @@ type PolicySet struct {
 	Fallback engine.Decision
 	// ABTest holds optional A/B experiment configuration.
 	ABTest *ABTestConfig
+
+	// ExtraSchema declares the intended type for each key in
+	// DecisionRequest.Extra.  Declared keys are type-coerced before being
+	// injected into the feature.Map as "extra.<key>".
+	// Undeclared keys are always injected as string.
+	ExtraSchema ExtraSchema
 }
 
 // ABTestConfig routes a fraction of traffic to an experimental pipeline.

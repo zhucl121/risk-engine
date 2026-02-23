@@ -68,6 +68,11 @@ func (p *pipeline) Execute(ctx context.Context, req *engine.DecisionRequest) (*e
 		return nil, fmt.Errorf("orchestrator: feature fetch: %w", err)
 	}
 
+	// ── Inject Extra fields into the feature map ───────────────────────────────
+	// After injection, DSL rules can reference "extra.<key>" directly.
+	// Type coercion is governed by PolicySet.ExtraSchema.
+	injectExtra(req, p.policy.ExtraSchema, features)
+
 	// ── A/B test routing ──────────────────────────────────────────────────────
 	steps := p.policy.Pipeline
 	if ab := p.policy.ABTest; ab != nil && ab.Enabled && rand.Float64() < ab.SplitPct { //nolint:gosec
@@ -136,6 +141,8 @@ func (p *pipeline) runStep(
 }
 
 // dispatch routes a step to the appropriate service.
+// If the step has a ParamMapping, the resolved params are merged on top of
+// the feature map before being forwarded to the downstream service.
 func (p *pipeline) dispatch(
 	ctx context.Context,
 	step Step,
@@ -144,15 +151,22 @@ func (p *pipeline) dispatch(
 ) (*StepResult, error) {
 	sr := &StepResult{Step: step}
 
+	// Resolve step-level parameter mapping and produce an effective feature map.
+	effectiveFeatures := features
+	if len(step.ParamMapping) > 0 {
+		params := step.ParamMapping.resolve(req, features)
+		effectiveFeatures = mergeParams(features, params)
+	}
+
 	switch step.Kind {
 	case StepKindRule:
-		return p.dispatchRule(ctx, step, req, features, sr)
+		return p.dispatchRule(ctx, step, req, effectiveFeatures, sr)
 
 	case StepKindModel:
-		return p.dispatchModel(ctx, step, features, sr)
+		return p.dispatchModel(ctx, step, effectiveFeatures, sr)
 
 	case StepKindList:
-		return p.dispatchList(ctx, req, sr)
+		return p.dispatchList(ctx, req, step, effectiveFeatures, sr)
 
 	case StepKindAggregate:
 		// Aggregation is done by apply(); no additional dispatch needed.
@@ -235,12 +249,32 @@ func (p *pipeline) dispatchModel(
 func (p *pipeline) dispatchList(
 	ctx context.Context,
 	req *engine.DecisionRequest,
+	step Step,
+	features feature.Map,
 	sr *StepResult,
 ) (*StepResult, error) {
-	queries := []*list.Query{
-		{Kind: "user", Value: req.UserID},
-		{Kind: "device", Value: req.DeviceID},
-		{Kind: "ip", Value: req.IP},
+	// Build query set: use ListQueryFields when configured,
+	// otherwise fall back to the default {user, device, ip} triple.
+	var queries []*list.Query
+	if len(step.ListQueryFields) > 0 {
+		for _, src := range step.ListQueryFields {
+			v := resolveSource(src, req, features)
+			val := v.StrVal
+			if v.Kind == feature.KindInt {
+				val = fmt.Sprintf("%d", v.IntVal)
+			}
+			if val == "" {
+				continue
+			}
+			// Use the source expression as the Kind label for traceability.
+			queries = append(queries, &list.Query{Kind: src, Value: val})
+		}
+	} else {
+		queries = []*list.Query{
+			{Kind: "user", Value: req.UserID},
+			{Kind: "device", Value: req.DeviceID},
+			{Kind: "ip", Value: req.IP},
+		}
 	}
 
 	innerFn := func(ctx context.Context) error {

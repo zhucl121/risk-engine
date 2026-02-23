@@ -18,11 +18,14 @@ import (
 
 // policySetYAML mirrors PolicySet for YAML unmarshalling.
 type policySetYAML struct {
-	SceneCode string       `yaml:"sceneCode"`
-	Version   string       `yaml:"version"`
-	Fallback  string       `yaml:"fallback"`
-	Pipeline  []stepYAML   `yaml:"pipeline"`
-	ABTest    *abTestYAML  `yaml:"abTest"`
+	SceneCode   string            `yaml:"sceneCode"`
+	Version     string            `yaml:"version"`
+	Fallback    string            `yaml:"fallback"`
+	Pipeline    []stepYAML        `yaml:"pipeline"`
+	ABTest      *abTestYAML       `yaml:"abTest"`
+	// ExtraSchema declares the type for each Extra key.
+	// Supported types: string (default), int, float, bool.
+	ExtraSchema map[string]string `yaml:"extraSchema"`
 }
 
 type abTestYAML struct {
@@ -33,14 +36,20 @@ type abTestYAML struct {
 }
 
 type stepYAML struct {
-	Name      string  `yaml:"name"`
-	Kind      string  `yaml:"kind"`
-	RuleGroup string  `yaml:"ruleGroup"`
-	Models    []string `yaml:"models"`
-	TimeoutMs int     `yaml:"timeoutMs"`
-	Parallel  bool    `yaml:"parallel"`
-	OnFailure string  `yaml:"onFailure"`
-	Strategy  string  `yaml:"strategy"`
+	Name            string            `yaml:"name"`
+	Kind            string            `yaml:"kind"`
+	RuleGroup       string            `yaml:"ruleGroup"`
+	Models          []string          `yaml:"models"`
+	TimeoutMs       int               `yaml:"timeoutMs"`
+	Parallel        bool              `yaml:"parallel"`
+	OnFailure       string            `yaml:"onFailure"`
+	Strategy        string            `yaml:"strategy"`
+	// ParamMapping maps downstream parameter names to source expressions.
+	// e.g. {"merchant_id": "extra.merchant_id", "channel": "WEB"}
+	ParamMapping    map[string]string `yaml:"params"`
+	// ListQueryFields overrides the default user/device/ip list queries.
+	// e.g. ["extra.merchant_id", "request.ip"]
+	ListQueryFields []string          `yaml:"listQueryFields"`
 }
 
 // atomicRegistry is the concrete Registry implementation.
@@ -157,12 +166,19 @@ func convertPolicy(y policySetYAML) (PolicySet, error) {
 		}
 	}
 
+	// Parse ExtraSchema.
+	schema := make(ExtraSchema, len(y.ExtraSchema))
+	for k, v := range y.ExtraSchema {
+		schema[k] = ExtraFieldType(v)
+	}
+
 	return PolicySet{
-		SceneCode: y.SceneCode,
-		Version:   y.Version,
-		Pipeline:  steps,
-		Fallback:  fallback,
-		ABTest:    abTest,
+		SceneCode:   y.SceneCode,
+		Version:     y.Version,
+		Pipeline:    steps,
+		Fallback:    fallback,
+		ABTest:      abTest,
+		ExtraSchema: schema,
 	}, nil
 }
 
@@ -180,7 +196,7 @@ func convertStep(sy stepYAML) (Step, error) {
 	case "CUSTOM":
 		kind = StepKindCustom
 	default:
-		return Step{}, fmt.Errorf("unknown step kind %q", sy.Kind)
+		return Step{}, fmt.Errorf("orchestrator: unknown step kind %q", sy.Kind)
 	}
 
 	var fp FailurePolicy
@@ -193,17 +209,26 @@ func convertStep(sy stepYAML) (Step, error) {
 		fp = FailurePolicySkip
 	}
 
+	// Parse ParamMapping.
+	pm := make(ParamMapping, len(sy.ParamMapping))
+	for k, v := range sy.ParamMapping {
+		pm[k] = v
+	}
+
 	return Step{
-		Name:      sy.Name,
-		Kind:      kind,
-		RuleGroup: sy.RuleGroup,
-		Models:    sy.Models,
-		Timeout:   millisToDuration(sy.TimeoutMs),
-		Parallel:  sy.Parallel,
-		OnFailure: fp,
-		Strategy:  AggregationStrategy(sy.Strategy),
+		Name:            sy.Name,
+		Kind:            kind,
+		RuleGroup:       sy.RuleGroup,
+		Models:          sy.Models,
+		Timeout:         millisToDuration(sy.TimeoutMs),
+		Parallel:        sy.Parallel,
+		OnFailure:       fp,
+		Strategy:        AggregationStrategy(sy.Strategy),
+		ParamMapping:    pm,
+		ListQueryFields: sy.ListQueryFields,
 	}, nil
 }
+
 
 func millisToDuration(ms int) time.Duration {
 	if ms <= 0 {
