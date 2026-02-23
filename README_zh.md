@@ -14,6 +14,8 @@
 
 ## 功能特性
 
+### 核心决策
+
 | 特性 | 说明 |
 |------|------|
 | **多策略决策** | 规则引擎 + ML 模型评分 + 名单服务，通过可配置 DAG 流水线协同编排 |
@@ -23,10 +25,33 @@
 | **独立 Feature Store** | 可选的外部特征服务，通过 gRPC 调用；内置 `VelocityGroup`（滑动窗口计数）和 `UserProfileGroup`（Redis JSON Hash）；超时时自动 fail-open |
 | **速率计数器** | Redis Lua 原子滑动窗口计数，支持任意时间粒度（1分钟 / 1小时 / 24小时） |
 | **名单服务** | Redis 黑名单 / 灰名单 / 白名单，O(1) 查询 |
-| **Extra 参数规格管理** | 每个场景的 Extra 字段规格存储于 MySQL，支持必需校验（缺失则拒绝请求）和可选默认值填充；后台每 30s 热重载 |
-| **Extra → 特征注入** | `DecisionRequest.Extra` 字段自动注入 `feature.Map`（key 为 `extra.<字段名>`），类型由 DB 规格驱动（string/int/float/bool）；步骤级 `ParamMapping` 支持向下游服务映射任意字段 |
-| **A/B 测试** | 按 `PolicySet.ABTest` 配置流量分流，实验组结果标记在 `RiskReasons` 中，无需重启 |
+
+### 策略编排
+
+| 特性 | 说明 |
+|------|------|
+| **A/B 测试** | 随机流量分流；实验组结果标记在 `RiskReasons` 中，无需重启 |
+| **灰度分流（Canary）** | 基于 SHA-256 hash 的**确定性分流**，同一用户每次都落入同一桶（稳定路由）；支持 userID / deviceID / sessionID / IP / `extra.<key>` 等多维度 hash key；通过独立 salt 隔离不同实验的桶位 |
+| **陪跑 / Shadow 模式** | 新策略并行执行，结果不影响主决策；全量写入 `shadow_audit` 日志，离线分析后再决定上线 |
+| **冠军-挑战者** | 多个挑战者策略后台并发执行，冠军结果返回给调用方；双方结果写入 `cc_audit`，含 `agreement` 字段，用于统计胜率、翻转率、延迟差 |
+| **步骤级条件** | 每个步骤可配置 DSL 表达式 `condition`，条件为 false 时跳过该步骤 |
+| **自动重试** | 步骤失败时按 `maxAttempts` + `delayMs` 自动重试 |
+| **多聚合策略** | `HIGHEST_RISK`（默认）/ `WEIGHTED`（加权求和）/ `RULE_FIRST`（规则优先，无命中再用模型分数） |
+| **降级策略** | 步骤失败策略：`SKIP`（跳过）/ `REJECT`（高风险兜底）/ `FALLBACK`（场景兜底决策） |
 | **熔断器** | 基于 `gobreaker` 的按步骤熔断（名单、模型），状态通过 Prometheus Gauge 暴露 |
+
+### 参数与数据
+
+| 特性 | 说明 |
+|------|------|
+| **Extra 参数规格管理** | 每个场景的 Extra 字段规格存储于 MySQL，支持必需校验（缺失则拒绝请求）和可选默认值填充；后台每 30s 热重载 |
+| **Extra → 特征注入** | `DecisionRequest.Extra` 字段自动注入 `feature.Map`（key 为 `extra.<字段名>`），类型由 DB 规格驱动（string / int / float / bool）；步骤级 `ParamMapping` 支持向下游服务映射任意字段 |
+| **场景无关设计** | 决策请求无业务耦合字段（金额、订单类型等均放入 `extra`），引擎适用于支付、营销、登录等任意风控场景 |
+
+### 可观测性与运维
+
+| 特性 | 说明 |
+|------|------|
 | **限流** | 两级令牌桶：全局 5000 RPS + 单 IP 100 RPS，超限返回 HTTP 429 |
 | **可观测性** | Prometheus 指标（决策延迟、规则命中、特征错误、活跃请求）、OpenTelemetry 链路追踪、结构化 Zap 日志、异步审计写入 |
 | **健康探针** | `/api/v1/livez`（存活探针）和 `/api/v1/readyz`（就绪探针，含 Redis 依赖检查），原生支持 Kubernetes |
@@ -61,15 +86,21 @@ go run ./cmd/server -config configs/config.local.yaml
 
 ### 发起一次风控决策
 
+所有业务字段（包括金额等）均通过 `extra` 传入，引擎不预设业务含义字段：
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/decision \
   -H "Content-Type: application/json" \
   -d '{
     "scene_code": "PAYMENT_CHECKOUT",
-    "user_id": "u123456",
-    "device_id": "d-abc-def",
-    "ip": "1.2.3.4",
-    "amount": 9900
+    "user_id":    "u123456",
+    "device_id":  "d-abc-def",
+    "ip":         "1.2.3.4",
+    "extra": {
+      "amount":      "9900",
+      "merchant_id": "M001",
+      "product_type": "GOODS"
+    }
   }'
 ```
 
@@ -78,10 +109,10 @@ curl -X POST http://localhost:8080/api/v1/decision \
 ```json
 {
   "request_id": "01HZ...",
-  "decision": "PASS",
+  "decision":   "PASS",
   "risk_score": 120,
   "risk_level": "LOW",
-  "hit_rules": [],
+  "hit_rules":  [],
   "model_scores": {"payment_fraud_xgb": 0.08},
   "risk_reasons": [],
   "cost_ms": 23
@@ -101,30 +132,36 @@ curl -X POST http://localhost:8080/api/v1/decision \
 ## 系统架构
 
 ```
-请求 → API 层（Gin HTTP + gRPC）
-                  ↓
-     限流 / 指标 / 链路追踪 中间件
-                  ↓
-          DecisionEngine（决策引擎）
-                  ↓
-          Orchestrator（DAG 编排 + A/B 路由）
-         ↙         ↓              ↘
-   名单服务      规则引擎         模型引擎
-  (Redis+熔断)  (RiskDSL)      (ONNX+熔断)
-         ↘         ↓              ↙
-          FeatureService（并行特征拉取）
-          ↙        ↓             ↘
-   VelocityFetcher  用户画像    设备信息
-   (滑动窗口计数)
-                  ↓
-           Redis（主存储）
-                  ↓
-     AuditWriter（异步 channel → 结构化日志 / Kafka）
-```
+请求 → API 层（Gin HTTP / gRPC）
+              ↓
+   限流 / 指标 / 链路追踪 中间件
+              ↓
+        DecisionEngine
+              ↓
+        Orchestrator（DAG 编排）
+         ├─ 路由层：Canary > A/B Test > 主 Pipeline
+         │
+         ├─ 主 Pipeline（顺序 + 并行步骤）
+         │    ├── LIST   →  名单服务（Redis + 熔断）
+         │    ├── RULE   →  规则引擎（RiskDSL）
+         │    └── MODEL  →  模型引擎（ONNX + 熔断）
+         │
+         ├─ Shadow Pipeline（后台并行，不影响主决策）
+         │    └── → shadow_audit 日志
+         │
+         └─ Champion-Challenger（后台并发，挑战者结果不返回）
+              └── → cc_audit 日志
 
-**关键说明：**
-- **熔断器**：连续失败 5 次后断开，30 秒后进入半开探测
-- **A/B 路由**：`PolicySet.ABTest.SplitPct` 比例的流量走 `ExperimentPipeline`，实验组结果附加标记
+  FeatureService（并行特征拉取）
+   ├── VelocityFetcher（滑动窗口计数）→ Redis
+   ├── UserProfile → Redis JSON
+   └── FeatureStoreFetcher → gRPC Feature Store
+
+AuditWriter（异步 channel → 结构化日志 / Kafka）
+  ├── audit（主决策记录）
+  ├── shadow_audit（陪跑记录）
+  └── cc_audit（冠军-挑战者记录）
+```
 
 详细架构设计与决策依据见 [docs/architecture.md](docs/architecture.md)。
 
@@ -134,79 +171,292 @@ curl -X POST http://localhost:8080/api/v1/decision \
 
 ### PolicySet（策略集）
 
-每个场景（`scene_code`）对应一个 `PolicySet`，定义完整的决策流水线：
+每个场景（`scene_code`）对应一个 `PolicySet`，通过 YAML 定义完整的决策流水线：
 
 ```yaml
-- sceneCode: payment          # 场景码
+- sceneCode: payment
   version: "1.0.0"
   fallback: MANUAL_REVIEW     # 流水线异常时的兜底决策
+  strategy: HIGHEST_RISK      # 聚合策略: HIGHEST_RISK | WEIGHTED | RULE_FIRST
+  extraSchema:
+    amount: int               # 静态类型声明（DB 规格优先）
+    merchant_id: string
+
   pipeline:
-    - name: blacklist_check   # 步骤名称
-      kind: LIST              # 步骤类型: LIST / RULE / MODEL / AGGREGATE
-      timeoutMs: 20           # 单步超时
-      onFailure: SKIP         # 失败策略: SKIP / REJECT / FALLBACK
+    - name: blacklist_check
+      kind: LIST
+      timeoutMs: 20
+      onFailure: SKIP
+      listQueryFields:        # 自定义查询维度（默认 user/device/ip）
+        - extra.merchant_id
+        - request.ip
+
     - name: payment_rules
       kind: RULE
       ruleGroup: payment
       timeoutMs: 50
+      condition: "extra.amount > 0"   # 步骤条件，false 时跳过
+      retry:
+        maxAttempts: 2
+        delayMs: 5
+
     - name: risk_model
       kind: MODEL
       models: [payment_fraud_v2]
       timeoutMs: 80
-      strategy: HIGHEST_RISK  # 聚合策略: HIGHEST_RISK / MAJORITY_VOTE
+      weight: 0.7             # WEIGHTED 策略时生效
+      params:                 # 步骤级参数映射
+        merchant: extra.merchant_id
+        channel:  "WEB"
+
+  # A/B 测试（随机分流，不稳定）
   abTest:
-    enabled: false
+    enabled: true
     experimentId: payment-model-v3
-    splitPct: 0.05            # 5% 流量走实验组
-    experimentPipeline: [...]
+    splitPct: 0.05
+    experimentPipeline:
+      - name: model_v3
+        kind: MODEL
+        models: [payment_fraud_v3]
+        timeoutMs: 80
+
+  # 灰度分流（hash 稳定，同一用户始终落同一桶）
+  canary:
+    enabled: true
+    canaryVersion: "v2.1.0"
+    trafficPct: 10            # 10% 用户进入灰度
+    hashKey: userID           # 路由 key: userID | deviceID | sessionID | ip | extra.<key>
+    salt: "payment_canary_v2" # 实验盐，不同实验须用不同 salt
+    canaryPipeline:
+      - name: new_rules
+        kind: RULE
+        ruleGroup: payment_v2
+      - name: model_v3
+        kind: MODEL
+        models: [payment_fraud_v3]
+
+  # 陪跑 / Shadow 模式（不影响主决策，结果写入 shadow_audit）
+  shadowPolicies:
+    - sceneCode: payment_new_policy
+      version: "draft-1"
+
+  # 冠军-挑战者（双方并行，冠军结果返回，均写 cc_audit）
+  championChallenger:
+    enabled: true
+    experimentID: "fraud_model_v3_eval"
+    challengers:
+      - challengerID: "model_v3_candidate"
+        trafficPct: 20         # 20% 用户参与挑战
+        hashKey: userID
+        salt: "cc_fraud_v3"
+        pipeline:
+          - name: model_v3
+            kind: MODEL
+            models: [payment_fraud_v3]
+      - challengerID: "rule_baseline"
+        trafficPct: 100
+        hashKey: userID
+        salt: "cc_rule_baseline"
+        pipeline:
+          - name: rules_only
+            kind: RULE
+            ruleGroup: payment
 ```
+
+---
+
+### 策略路由优先级
+
+```
+Canary（hash 稳定，用户维度定向）
+  ↓ 未命中
+A/B Test（随机，请求维度）
+  ↓ 未命中
+主 Pipeline
+```
+
+三者互斥，同一请求只走一个分支。Shadow 模式和冠军-挑战者作为独立的**旁路并发**，不参与路由竞争，所有请求都会触发（在各自的流量比例内）。
+
+---
+
+### 各模式对比
+
+| 模式 | 主决策影响 | 流量路由 | 用途 |
+|------|-----------|---------|------|
+| **A/B 测试** | ✅ 实验组走不同 pipeline | 随机（每次请求独立） | 对称实验，两组均为生产策略 |
+| **Canary 灰度** | ✅ 灰度用户走新 pipeline | Hash 稳定（同用户同桶） | 渐进发布，逐步扩大新策略覆盖 |
+| **Shadow 陪跑** | ❌ 不影响主决策 | 全量（或特定场景） | 上线前验证，离线对比分析 |
+| **冠军-挑战者** | ❌ 挑战者不影响主决策 | Hash 稳定（按 trafficPct） | 策略评估，统计显著性对比 |
+
+---
 
 ### RiskDSL（风控表达式语言）
 
-规则条件使用自研的 RiskDSL 编写，支持：
+规则条件使用自研的 RiskDSL 编写。DSL 在规则加载时由 ANTLR4 编译为 Go 闭包，运行时零分配。
+
+#### 支持的操作符
 
 ```
-# 基础比较
+# 比较运算
 amount > 10000
+risk_score != 0
 
-# 逻辑组合
-amount > 5000 AND velocity("pay", user_id, "1h") > 10
+# 逻辑运算
+amount > 5000 && velocity("pay", user_id, "1h") > 10
+amount > 1000 || inList("blacklist_ip", ip)
 
-# 内置函数
-inList("blacklist_ip", ip) OR modelScore("fraud_v2") > 0.85
+# in / not in（数组成员判断）
+extra.product_type in ["DIGITAL", "VIRTUAL"]
+extra.channel not in ["OFFLINE", "STORE"]
 
-# 地理位置
-geoIP(ip) == "CN" AND within(lat, lon, 39.9, 116.4, 50)
+# 三元表达式
+extra.vip_level == "gold" ? 200 : 500
+
+# 取反
+!isEmpty(user_id)
 ```
 
-内置函数说明：
+#### 内置函数
+
+**字符串函数**
 
 | 函数 | 说明 |
 |------|------|
-| `inList(kind, value)` | 查询名单服务 |
+| `contains(s, sub)` | 包含子串 |
+| `startsWith(s, prefix)` | 前缀匹配 |
+| `endsWith(s, suffix)` | 后缀匹配 |
+| `match(s, pattern)` | 正则匹配（缓存编译） |
+| `lower(s)` / `upper(s)` | 大小写转换 |
+| `trim(s)` | 去除首尾空格 |
+| `strlen(s)` | 字符串长度 |
+| `isEmpty(s)` | 是否为空 |
+
+**数学函数**
+
+| 函数 | 说明 |
+|------|------|
+| `abs(n)` | 绝对值 |
+| `ceil(n)` / `floor(n)` / `round(n)` | 取整 |
+| `sqrt(n)` | 开方 |
+| `min(a, b)` / `max(a, b)` | 最值 |
+| `clamp(n, lo, hi)` | 区间限制 |
+
+**时间函数**
+
+| 函数 | 说明 |
+|------|------|
+| `now()` | 当前 Unix 时间戳（秒） |
+| `nowMs()` | 当前毫秒时间戳 |
+| `daysSince(t)` | 距今天数 |
+| `hoursSince(t)` | 距今小时数 |
+| `secondsSince(t)` | 距今秒数 |
+| `toUnix(t)` | 时间字符串转 Unix 时间戳 |
+| `hour(t)` | 提取小时（0–23） |
+| `weekday(t)` | 星期几（0 = 周日，6 = 周六） |
+
+**类型转换与条件函数**
+
+| 函数 | 说明 |
+|------|------|
+| `toInt(v)` / `toFloat(v)` / `toString(v)` / `toBool(v)` | 类型转换 |
+| `isNull(v)` | 是否为空值 |
+| `coalesce(a, b, ...)` | 返回第一个非空值 |
+| `ifThen(cond, a, b)` | 条件选择（等效三元运算） |
+
+**风控专属函数**
+
+| 函数 | 说明 |
+|------|------|
+| `inList(kind, value)` | 查询名单服务（黑/灰/白名单） |
 | `velocity(prefix, id, window)` | 读取滑动窗口计数 |
 | `modelScore(name)` | 获取 ML 模型评分（0~1） |
 | `geoIP(ip)` | 返回 IP 归属国家码 |
 | `within(lat, lon, clat, clon, km)` | 地理围栏判断 |
 
+**规则示例**
+
+```
+# 高频支付检测（1小时内超过10次）
+velocity("pay_count", user_id, "1h") > 10 && extra.amount > 5000
+
+# 黑名单 + 金额组合
+inList("blacklist_user", user_id) || (extra.amount > 50000 && extra.vip_level not in ["gold", "platinum"])
+
+# 夜间高额交易（23点~6点）
+extra.amount > 10000 && (hour(now()) >= 23 || hour(now()) <= 6)
+
+# 新设备高额转账
+daysSince(extra.device_register_time) < 7 && extra.amount > 20000
+
+# 三元判断风险阈值
+velocity("pay_fail", user_id, "24h") > (extra.vip_level == "gold" ? 20 : 5)
+```
+
+DSL 完整语法文档见 [docs/dsl-guide.md](docs/dsl-guide.md)。
+
 ---
 
-## 配置说明
+## Feature Store（独立特征服务）
 
-所有配置均为 YAML 格式，完整配置项及注释见 [configs/config.example.yaml](configs/config.example.yaml)。
+特征拉取支持两种模式，可按需选择或混合使用：
 
-核心配置项：
+### 模式对比
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `server.addr` | HTTP 监听地址 | `:8080` |
-| `server.grpc_addr` | gRPC 监听地址 | `:9090` |
-| `redis` | Redis 连接池、集群 / Sentinel 模式 | — |
-| `kafka` | Broker 地址、审计 Topic（可选） | — |
-| `engine.policy_dir` | PolicySet YAML 文件目录 | `configs/policies/` |
-| `rules` | 规则分组、热更新间隔 | — |
-| `models` | ONNX 模型路径 | — |
-| `feature.redis_timeout` | 单个特征拉取 Redis 超时 | `10ms` |
+```
+模式一（默认）：进程内 Fetcher，直连 Redis
+RiskEngine 进程
+  └── feature.Service
+        ├── VelocityFetcher  ──→ Redis
+        └── ...
+
+模式二：外部 Feature Store，通过 gRPC 调用
+RiskEngine 进程                     Feature Store 进程
+  └── feature.Service                 └── FeatureStoreService
+        └── FeatureStoreFetcher ─gRPC─→    ├── VelocityGroup   → Redis
+                                           └── UserProfileGroup → Redis JSON
+```
+
+### 启动独立 Feature Store
+
+```bash
+go run ./cmd/featurestore -config configs/config.yaml
+```
+
+### 配置决策引擎接入
+
+```yaml
+feature_store:
+  enabled: true
+  addr: "localhost:9100"
+  request_timeout: "20ms"
+  groups:
+    - name: "user_profile"
+      timeout: "15ms"
+    - name: "velocity"
+      timeout: "10ms"
+```
+
+### 自定义 FeatureGroup
+
+```go
+type MyGroup struct{ db *sql.DB }
+
+func (g *MyGroup) Name() string { return "my_group" }
+
+func (g *MyGroup) Fetch(ctx context.Context, entity *riskv1.EntityContext) (
+    map[string]*riskv1.FeatureValue, []string, error,
+) {
+    return map[string]*riskv1.FeatureValue{
+        "credit_score": {Value: &riskv1.FeatureValue_IntVal{IntVal: 750}},
+    }, nil, nil
+}
+```
+
+注册：
+
+```go
+store.DefaultRegistry.Register(&MyGroup{db: db})
+```
 
 ---
 
@@ -225,9 +475,11 @@ POST /api/v1/decision
 | `scene_code` | string | 场景码（必填） |
 | `user_id` | string | 用户 ID |
 | `device_id` | string | 设备 ID |
+| `session_id` | string | 会话 ID |
 | `ip` | string | 客户端 IP |
-| `amount` | int64 | 交易金额（最小货币单位，如分） |
-| `extra` | map | 场景自定义扩展字段 |
+| `extra` | map[string]string | 场景自定义扩展字段（包括金额等业务字段） |
+
+> **注意**：交易金额等业务字段通过 `extra` 传递，例如 `"extra": {"amount": "9900"}`，引擎会按场景配置的 `extraSchema` 进行类型转换。
 
 #### 健康检查
 
@@ -240,114 +492,28 @@ GET /metrics         # Prometheus 指标
 #### 规则管理（Admin）
 
 ```
-GET    /admin/v1/rules              # 查询规则列表
-POST   /admin/v1/rules              # 创建规则
-PUT    /admin/v1/rules/:id          # 更新规则
-DELETE /admin/v1/rules/:id          # 删除规则
-POST   /admin/v1/rules/:id/enable   # 启用规则
-POST   /admin/v1/rules/:id/disable  # 禁用规则
-POST   /admin/v1/rules/validate     # 校验 DSL 表达式
+GET    /admin/v1/rules                          # 查询规则列表
+POST   /admin/v1/rules                          # 创建规则
+PUT    /admin/v1/rules/:id                      # 更新规则
+DELETE /admin/v1/rules/:id                      # 删除规则
+POST   /admin/v1/rules/:id/enable               # 启用规则
+POST   /admin/v1/rules/:id/disable              # 禁用规则
+POST   /admin/v1/rules/validate                 # 校验 DSL 表达式
+GET    /admin/v1/scenes/:scene/extra-params     # 查询场景 Extra 参数规格
+POST   /admin/v1/scenes/:scene/extra-params     # 新增参数规格
+PUT    /admin/v1/scenes/:scene/extra-params/:key  # 更新参数规格
+DELETE /admin/v1/scenes/:scene/extra-params/:key  # 删除参数规格
 ```
 
 ### gRPC API
 
-服务定义见 [api/grpc/proto/decision.proto](api/grpc/proto/decision.proto)。
+服务定义见 [api/grpc/proto/decision.proto](api/grpc/proto/decision.proto)，默认监听 `:9090`。
 
 ```protobuf
 service DecisionService {
   rpc Evaluate(DecisionRequest) returns (DecisionResponse);
   rpc BatchEvaluate(BatchDecisionRequest) returns (BatchDecisionResponse);
   rpc Health(HealthRequest) returns (HealthResponse);
-}
-```
-
-gRPC 默认监听 `:9090`。
-
----
-
-## Feature Store（独立特征服务）
-
-特征拉取支持两种模式，可按需选择或混合使用：
-
-### 模式对比
-
-```
-模式一（默认）：进程内 Fetcher，直连 Redis
-RiskEngine 进程
-  └── feature.Service
-        ├── VelocityFetcher  ──→ Redis（pkg/sliding）
-        └── PromoVelocityFetcher ──→ Redis
-
-模式二：外部 Feature Store，通过 gRPC 调用
-RiskEngine 进程                     Feature Store 进程（cmd/featurestore）
-  └── feature.Service                     └── FeatureStoreService
-        └── FeatureStoreFetcher ──gRPC──→       ├── VelocityGroup   → Redis
-                                                └── UserProfileGroup → Redis JSON
-```
-
-### 启动独立 Feature Store
-
-```bash
-# Feature Store 默认监听 :9100
-go run ./cmd/featurestore -config configs/config.yaml
-```
-
-### 决策引擎接入 Feature Store
-
-在 `configs/config.yaml` 中开启：
-
-```yaml
-feature_store:
-  enabled: true
-  addr: "localhost:9100"    # sidecar 用 localhost，k8s 用 ClusterIP DNS
-  request_timeout: "20ms"
-  groups:
-    - name: "user_profile"  # 对应 Feature Store 中注册的 FeatureGroup.Name()
-      timeout: "15ms"
-    - name: "velocity"
-      timeout: "10ms"
-```
-
-启动后，`feature.Service` 会同时并发调用进程内 Fetcher 和 gRPC Fetcher，结果合并入同一个 `feature.Map`。
-
-### 自定义 FeatureGroup
-
-在 Feature Store 服务中实现 `store.FeatureGroup` 接口：
-
-```go
-type MyGroup struct{ db *sql.DB }
-
-func (g *MyGroup) Name() string { return "my_group" }
-
-func (g *MyGroup) Fetch(ctx context.Context, entity *riskv1.EntityContext) (
-    map[string]*riskv1.FeatureValue, []string, error,
-) {
-    // 从数据库 / 外部 API 查询特征
-    return map[string]*riskv1.FeatureValue{
-        "my_feature": {Value: &riskv1.FeatureValue_IntVal{IntVal: 100}},
-    }, nil, nil
-}
-```
-
-注册到 store：
-
-```go
-registry.Register(&MyGroup{db: db})
-```
-
-Feature Store 重启后决策引擎会自动重连（gRPC retry policy 已内置）。
-
-### 健康检查
-
-Feature Store 客户端自动接入 `/api/v1/readyz`：
-
-```json
-{
-  "ready": false,
-  "checks": [
-    {"name": "redis", "healthy": true},
-    {"name": "feature-store", "healthy": false, "message": "grpc health: connection refused"}
-  ]
 }
 ```
 
@@ -366,7 +532,7 @@ Feature Store 客户端自动接入 `/api/v1/readyz`：
 
 ### 添加特征拉取器
 
-1. 在 `internal/feature/fetchers/<name>.go` 实现 `feature.Fetcher` 接口：
+1. 实现 `feature.Fetcher` 接口：
 
 ```go
 type Fetcher interface {
@@ -395,10 +561,7 @@ mysql -u root riskengine < configs/migrations/002_create_scene_extra_params.sql
 通过管理 API 维护规格：
 
 ```bash
-# 查询场景的 Extra 参数规格
-GET /admin/v1/scenes/payment/extra-params
-
-# 新增必需字段
+# 必需字段（缺失则请求被 400 拒绝）
 POST /admin/v1/scenes/payment/extra-params
 {
   "param_key":   "merchant_id",
@@ -407,7 +570,7 @@ POST /admin/v1/scenes/payment/extra-params
   "description": "商户 ID，必填"
 }
 
-# 新增可选字段（带默认值）
+# 可选字段（缺失时自动填充 default_val）
 POST /admin/v1/scenes/payment/extra-params
 {
   "param_key":   "product_type",
@@ -416,13 +579,6 @@ POST /admin/v1/scenes/payment/extra-params
   "default_val": "GOODS",
   "description": "商品类型，默认 GOODS"
 }
-
-# 更新字段
-PUT /admin/v1/scenes/payment/extra-params/product_type
-{ "default_val": "DIGITAL" }
-
-# 软删除字段
-DELETE /admin/v1/scenes/payment/extra-params/product_type
 ```
 
 **运行时行为：**
@@ -435,6 +591,65 @@ DELETE /admin/v1/scenes/payment/extra-params/product_type
 | 字段已存在 | 直接做类型转换，跳过默认值填充 |
 
 DB 规格与 YAML 静态 `ExtraSchema` 合并，**DB 优先**。规格缓存在内存中，后台每 30s 增量热重载。
+
+### 配置灰度分流（Canary）
+
+灰度分流使用 SHA-256 哈希取模，保证**同一用户每次落入同一桶**：
+
+```yaml
+canary:
+  enabled: true
+  canaryVersion: "v2.1.0"
+  trafficPct: 10        # 10% 用户进入灰度（整数，精确控制）
+  hashKey: userID       # userID | deviceID | sessionID | ip | extra.<key>
+  salt: "exp_payment_canary_v2"   # 每个实验用不同 salt，避免不同实验桶位相关
+  canaryPipeline:
+    - name: new_rule_engine
+      kind: RULE
+      ruleGroup: payment_v2
+```
+
+**扩量流程**：从 5% → 10% → 25% → 50% → 100%，逐步在管理后台调整 `trafficPct`，无需重启服务。
+
+### 配置冠军-挑战者实验
+
+```yaml
+championChallenger:
+  enabled: true
+  experimentID: "fraud_model_eval_q1"
+  challengers:
+    - challengerID: "xgb_v3"
+      trafficPct: 30
+      hashKey: userID
+      salt: "cc_xgb_v3_q1"
+      pipeline:
+        - name: model_v3
+          kind: MODEL
+          models: [fraud_xgb_v3]
+```
+
+查询 cc_audit 日志进行统计对比：
+
+```bash
+# 按实验 ID 聚合，计算挑战者与冠军的判决一致率
+jq 'select(.experiment_id == "fraud_model_eval_q1") | .agreement' cc_audit.log | \
+  awk '{a[$0]++} END {print "agree:", a["true"], "disagree:", a["false"]}'
+```
+
+### 配置 Shadow 陪跑模式
+
+```yaml
+shadowPolicies:
+  - sceneCode: payment_new_strategy
+    version: "draft-2025Q1"
+```
+
+陪跑结果写入 `shadow_audit` 日志，字段包含 `shadow_decision`、`prod_decision`，可直接对比分析：
+
+```bash
+# 查看陪跑与主策略的判决差异
+jq '{req: .request_id, prod: .production_decision, shadow: .decision}' shadow_audit.log
+```
 
 ### 添加 ML 模型
 
@@ -449,8 +664,10 @@ DB 规格与 YAML 静态 `ExtraSchema` 合并，**DB 优先**。规格缓存在�
 在 `pkg/dsl/builtins/` 中注册自定义函数：
 
 ```go
-registry.Register("myFunc", func(ctx context.Context, rt dsl.Runtime, args []dsl.Value) (dsl.Value, error) {
-    // 实现自定义逻辑
+registry.RegisterFunc("myRiskScore", func(ctx context.Context, rt *dsl.Runtime, args []dsl.Value) (dsl.Value, error) {
+    // 访问 request 和 features
+    userID := rt.Request.UserID
+    _ = userID
     return dsl.IntValue(42), nil
 })
 ```
@@ -472,8 +689,9 @@ DSL 表达式基准（单核，无 Redis 依赖）：
 
 | 场景 | 耗时 | 堆分配 |
 |------|------|--------|
-| 简单条件（`amount > 1000`） | P99 29ns | 0 allocs |
+| 简单条件（`extra.amount > 1000`） | P99 29ns | 0 allocs |
 | 含特征读取（`velocity(...)>10`） | P99 97ns | 0 allocs |
+| `in` 数组判断（5 元素） | P99 43ns | 0 allocs |
 
 本地运行基准测试：
 
@@ -490,46 +708,47 @@ riskengine/
 ├── cmd/
 │   ├── server/            # 主 HTTP + gRPC 服务入口
 │   └── featurestore/      # 独立 Feature Store gRPC 服务入口
-├── internal/              # 私有业务代码
+├── internal/
 │   ├── engine/            # 顶层 DecisionEngine，请求生命周期
 │   ├── rule/              # 规则存储、评估器、热更新
 │   ├── feature/           # 并行特征拉取
 │   │   └── fetchers/      # 具体拉取器（VelocityFetcher 等）
-│   ├── featurestore/      # gRPC Feature Store 客户端、Fetcher 适配器、Server 实现
+│   ├── featurestore/      # gRPC Feature Store 客户端 + 服务端
 │   │   └── store/         # FeatureGroup 注册表（VelocityGroup / UserProfileGroup）
 │   ├── model/             # 模型注册表、ONNX 评分接口
-│   ├── list/              # Redis 名单服务（黑名单 / 灰名单）
-│   ├── orchestrator/      # DAG 执行器、A/B 路由、策略注册表、Extra 注入
-│   ├── scene/             # 场景级 Extra 参数规格（DB 持久化，带热重载）
-│   ├── audit/             # 异步 channel 审计写入（→ 日志 / Kafka）
+│   ├── list/              # Redis 名单服务（黑名单 / 灰名单 / 白名单）
+│   ├── orchestrator/      # DAG 执行器、策略路由（A/B + Canary）、
+│   │                      # 陪跑 Shadow、冠军-挑战者、Extra 注入、熔断
+│   ├── scene/             # 场景级 Extra 参数规格（DB 持久化，热重载）
+│   ├── audit/             # 异步审计写入（主决策 / shadow_audit / cc_audit）
 │   ├── metrics/           # Prometheus 指标定义
-│   ├── middleware/        # Gin 中间件（RequestID / Metrics / RateLimit / Logger / Tracing）
+│   ├── middleware/        # Gin 中间件（RequestID / 指标 / 限流 / 日志 / 追踪）
 │   ├── health/            # 存活 / 就绪检查器
 │   ├── resilience/        # 熔断器（gobreaker 封装）
 │   └── config/            # 配置加载器
-├── pkg/                   # 可复用公共包
+├── pkg/
 │   ├── dsl/               # 自研 RiskDSL（ANTLR4-Go / AST / 代码生成）
 │   │   ├── grammar/       # RiskDSL.g4 语法文件
 │   │   ├── parser/        # ANTLR4 自动生成的 Parser（请勿手动修改）
 │   │   ├── ast/           # AST 节点类型
-│   │   └── builtins/      # 内置风控函数（inList / velocity / ...）
+│   │   └── builtins/      # 内置函数（字符串 / 数学 / 时间 / 类型转换 / 风控）
 │   ├── sliding/           # Redis Lua 滑动窗口速率计数器
 │   ├── bloom/             # 进程内 Bloom 过滤器
 │   └── pool/              # 对象池工具
 ├── api/
-│   ├── grpc/              # Proto 定义 + 生成代码 + Server 实现
+│   ├── grpc/
 │   │   ├── proto/         # decision.proto
 │   │   ├── v1/            # protoc 生成的 Go 代码
 │   │   └── server/        # DecisionServer 实现
-│   └── http/              # Gin HTTP Handler
-│       ├── v1/            # 决策 API / 健康检查 / livez / readyz
-│       └── admin/v1/      # 规则管理 CRUD API + Extra 参数规格管理 API
+│   └── http/
+│       ├── v1/            # 决策 API / 健康检查
+│       └── admin/v1/      # 规则管理 + Extra 参数规格管理
 ├── configs/
 │   ├── config.example.yaml
-│   ├── migrations/        # 数据库迁移脚本（SQL）
-│   └── policies/          # PolicySet YAML 文件（启动时自动加载）
-├── deployments/           # Docker 和 Kubernetes 部署清单
-├── docs/                  # 架构文档、设计方案
+│   ├── migrations/        # 数据库迁移 SQL
+│   └── policies/          # PolicySet YAML（启动时自动加载）
+├── deployments/           # Docker / Kubernetes 部署清单
+├── docs/                  # 架构文档、DSL 指南、设计方案
 └── openspec/              # 变更提案与设计规范
 ```
 
