@@ -13,10 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// shadowChan is the separate buffer for shadow records to keep them isolated
-// from the main audit channel.
-type shadowChan = chan *ShadowRecord
-
 const defaultBufferSize = 4096
 
 // ChannelWriter is a non-blocking audit Writer that enqueues records into a
@@ -26,17 +22,18 @@ const defaultBufferSize = 4096
 // JSON and emit a structured log entry so the system is self-contained.
 //
 // Design guarantees:
-//   - Write() / WriteShadow() never block the caller; full channel → drop + counter
+//   - Write() / WriteShadow() / WriteCC() never block the caller; full channel → drop + counter
 //   - Flush() blocks until the channel is drained or ctx is cancelled
 //   - Close() signals the consumer to stop; calling Write after Close is a no-op
 type ChannelWriter struct {
-	ch         chan *Record
-	shadowCh   shadowChan
-	logger     *zap.Logger
-	wg         sync.WaitGroup
-	dropped    atomic.Int64
-	once       sync.Once // guards Close
-	closed     atomic.Bool
+	ch       chan *Record
+	shadowCh chan *ShadowRecord
+	ccCh     chan *ChampionChallengerRecord
+	logger   *zap.Logger
+	wg       sync.WaitGroup
+	dropped  atomic.Int64
+	once     sync.Once // guards Close
+	closed   atomic.Bool
 }
 
 // NewChannelWriter creates a ChannelWriter and starts the background consumer.
@@ -47,12 +44,14 @@ func NewChannelWriter(logger *zap.Logger, bufferSize int) *ChannelWriter {
 	}
 	w := &ChannelWriter{
 		ch:       make(chan *Record, bufferSize),
-		shadowCh: make(shadowChan, bufferSize),
+		shadowCh: make(chan *ShadowRecord, bufferSize),
+		ccCh:     make(chan *ChampionChallengerRecord, bufferSize),
 		logger:   logger,
 	}
-	w.wg.Add(2)
+	w.wg.Add(3)
 	go w.consume()
 	go w.consumeShadow()
+	go w.consumeCC()
 	return w
 }
 
@@ -113,6 +112,22 @@ func (w *ChannelWriter) WriteShadow(r *ShadowRecord) {
 	}
 }
 
+// WriteCC enqueues a champion-challenger record for asynchronous delivery.
+func (w *ChannelWriter) WriteCC(r *ChampionChallengerRecord) {
+	if w.closed.Load() {
+		return
+	}
+	select {
+	case w.ccCh <- r:
+	default:
+		n := w.dropped.Add(1)
+		w.logger.Warn("cc_audit channel full, record dropped",
+			zap.Int64("total_dropped", n),
+			zap.String("request_id", r.RequestID),
+		)
+	}
+}
+
 // Close signals the background consumer to stop after draining the channel.
 // It blocks until the consumer goroutine exits.
 func (w *ChannelWriter) Close() error {
@@ -120,6 +135,7 @@ func (w *ChannelWriter) Close() error {
 		w.closed.Store(true)
 		close(w.ch)
 		close(w.shadowCh)
+		close(w.ccCh)
 	})
 	w.wg.Wait()
 	return nil
@@ -163,6 +179,40 @@ func (w *ChannelWriter) emit(r *Record) {
 		zap.String("decision", string(r.Decision)),
 		zap.Int("risk_score", r.RiskScore),
 		zap.Int64("cost_ms", r.CostMs),
+		zap.ByteString("payload", b),
+	)
+}
+
+// consumeCC drains the champion-challenger channel.
+func (w *ChannelWriter) consumeCC() {
+	defer w.wg.Done()
+	for r := range w.ccCh {
+		w.emitCC(r)
+	}
+}
+
+// emitCC serialises a champion-challenger record and writes it under the "cc_audit" key.
+func (w *ChannelWriter) emitCC(r *ChampionChallengerRecord) {
+	b, err := json.Marshal(r)
+	if err != nil {
+		w.logger.Error("cc_audit: marshal failed",
+			zap.String("request_id", r.RequestID),
+			zap.Error(err),
+		)
+		return
+	}
+	w.logger.Info("cc_audit",
+		zap.String("request_id", r.RequestID),
+		zap.String("scene_code", r.SceneCode),
+		zap.String("experiment_id", r.ExperimentID),
+		zap.String("challenger_id", r.ChallengerID),
+		zap.String("champion_decision", r.ChampionDecision),
+		zap.String("challenger_decision", r.ChallengerDecision),
+		zap.Int("champion_score", r.ChampionRiskScore),
+		zap.Int("challenger_score", r.ChallengerRiskScore),
+		zap.Bool("agreement", r.Agreement),
+		zap.Int64("champion_cost_ms", r.ChampionCostMs),
+		zap.Int64("challenger_cost_ms", r.ChallengerCostMs),
 		zap.ByteString("payload", b),
 	)
 }

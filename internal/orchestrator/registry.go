@@ -29,6 +29,10 @@ type policySetYAML struct {
 	Strategy  string `yaml:"strategy"` // HIGHEST_RISK | WEIGHTED | RULE_FIRST
 	Pipeline  []stepYAML `yaml:"pipeline"`
 	ABTest    *abTestYAML `yaml:"abTest"`
+	// Canary enables deterministic hash-based traffic splitting.
+	Canary *canaryYAML `yaml:"canary"`
+	// ChampionChallenger enables simultaneous execution of challenger pipelines.
+	ChampionChallenger *championChallengerYAML `yaml:"championChallenger"`
 	// ShadowPolicies lists policies to run in shadow/dry-run mode.
 	ShadowPolicies []shadowPolicyYAML `yaml:"shadowPolicies"`
 	// ExtraSchema declares the type for each Extra key.
@@ -41,6 +45,29 @@ type abTestYAML struct {
 	ExperimentID       string     `yaml:"experimentId"`
 	SplitPct           float64    `yaml:"splitPct"`
 	ExperimentPipeline []stepYAML `yaml:"experimentPipeline"`
+}
+
+type canaryYAML struct {
+	Enabled        bool       `yaml:"enabled"`
+	CanaryVersion  string     `yaml:"canaryVersion"`
+	TrafficPct     int        `yaml:"trafficPct"`
+	HashKey        string     `yaml:"hashKey"`
+	Salt           string     `yaml:"salt"`
+	CanaryPipeline []stepYAML `yaml:"canaryPipeline"`
+}
+
+type challengerVariantYAML struct {
+	ChallengerID string     `yaml:"challengerID"`
+	TrafficPct   int        `yaml:"trafficPct"`
+	HashKey      string     `yaml:"hashKey"`
+	Salt         string     `yaml:"salt"`
+	Pipeline     []stepYAML `yaml:"pipeline"`
+}
+
+type championChallengerYAML struct {
+	Enabled      bool                    `yaml:"enabled"`
+	ExperimentID string                  `yaml:"experimentID"`
+	Challengers  []challengerVariantYAML `yaml:"challengers"`
 }
 
 type stepRetryYAML struct {
@@ -215,15 +242,67 @@ func convertPolicy(y policySetYAML) (PolicySet, error) {
 		}
 	}
 
+	// Parse Canary config.
+	var canary *CanaryConfig
+	if y.Canary != nil && y.Canary.Enabled {
+		canarySteps := make([]Step, 0, len(y.Canary.CanaryPipeline))
+		for _, sy := range y.Canary.CanaryPipeline {
+			s, err := convertStep(sy)
+			if err != nil {
+				return PolicySet{}, fmt.Errorf("orchestrator: scene %s canary: %w", y.SceneCode, err)
+			}
+			canarySteps = append(canarySteps, s)
+		}
+		canary = &CanaryConfig{
+			Enabled:        y.Canary.Enabled,
+			CanaryVersion:  y.Canary.CanaryVersion,
+			TrafficPct:     y.Canary.TrafficPct,
+			HashKey:        y.Canary.HashKey,
+			Salt:           y.Canary.Salt,
+			CanaryPipeline: canarySteps,
+		}
+	}
+
+	// Parse ChampionChallenger config.
+	var cc *ChampionChallengerConfig
+	if y.ChampionChallenger != nil && y.ChampionChallenger.Enabled {
+		variants := make([]ChallengerVariant, 0, len(y.ChampionChallenger.Challengers))
+		for _, vy := range y.ChampionChallenger.Challengers {
+			challSteps := make([]Step, 0, len(vy.Pipeline))
+			for _, sy := range vy.Pipeline {
+				s, err := convertStep(sy)
+				if err != nil {
+					return PolicySet{}, fmt.Errorf("orchestrator: scene %s challenger %s: %w",
+						y.SceneCode, vy.ChallengerID, err)
+				}
+				challSteps = append(challSteps, s)
+			}
+			variants = append(variants, ChallengerVariant{
+				ChallengerID: vy.ChallengerID,
+				TrafficPct:   vy.TrafficPct,
+				HashKey:      vy.HashKey,
+				Salt:         vy.Salt,
+				Pipeline:     challSteps,
+			})
+		}
+		cc = &ChampionChallengerConfig{
+			Enabled:      y.ChampionChallenger.Enabled,
+			ExperimentID: y.ChampionChallenger.ExperimentID,
+			Challengers:  variants,
+		}
+	}
+
 	return PolicySet{
-		SceneCode:      y.SceneCode,
-		Version:        y.Version,
-		Pipeline:       steps,
-		Fallback:       fallback,
-		Strategy:       pipelineStrategy,
-		ABTest:         abTest,
-		ShadowPolicies: shadowPolicies,
-		ExtraSchema:    schema,
+		SceneCode:          y.SceneCode,
+		Version:            y.Version,
+		Pipeline:           steps,
+		Fallback:           fallback,
+		Strategy:           pipelineStrategy,
+		ABTest:             abTest,
+		Canary:             canary,
+		ChampionChallenger: cc,
+		ShadowPolicies:     shadowPolicies,
+		ExtraSchema:        schema,
 	}, nil
 }
 

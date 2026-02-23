@@ -110,14 +110,42 @@ func (p *pipeline) Execute(ctx context.Context, req *engine.DecisionRequest) (*e
 	// Type coercion is governed by the merged effectiveSchema.
 	injectExtra(req, effectiveSchema, features)
 
-	// ── A/B test routing ──────────────────────────────────────────────────────
+	// ── Traffic-steering priority (highest specificity wins) ──────────────────
+	//
+	// Priority order:
+	//   1. Canary routing (deterministic hash, stable per user) — for gradual rollout
+	//   2. A/B test routing (random per request) — for symmetric experiments
+	//   3. Main pipeline
+	//
+	// At most ONE routing decision is made per request.
+
 	steps := p.policy.Pipeline
-	if ab := p.policy.ABTest; ab != nil && ab.Enabled && rand.Float64() < ab.SplitPct { //nolint:gosec
-		res.RiskReasons = append(res.RiskReasons, "abtest:"+ab.ExperimentID)
-		if len(ab.ExperimentPipeline) > 0 {
-			steps = ab.ExperimentPipeline
+	routeLabel := ""
+
+	// 1. Canary: hash-stable, per-user deterministic routing.
+	if c := p.policy.Canary; c != nil && c.Enabled && c.TrafficPct > 0 {
+		if inCanary(c, req.UserID, req.DeviceID, req.SessionID, req.IP, req.Extra) {
+			routeLabel = "canary:" + c.CanaryVersion
+			if len(c.CanaryPipeline) > 0 {
+				steps = c.CanaryPipeline
+			}
 		}
 	}
+
+	// 2. A/B test: random per request (only if canary did not already route).
+	if routeLabel == "" {
+		if ab := p.policy.ABTest; ab != nil && ab.Enabled && rand.Float64() < ab.SplitPct { //nolint:gosec
+			routeLabel = "abtest:" + ab.ExperimentID
+			if len(ab.ExperimentPipeline) > 0 {
+				steps = ab.ExperimentPipeline
+			}
+		}
+	}
+
+	if routeLabel != "" {
+		res.RiskReasons = append(res.RiskReasons, routeLabel)
+	}
+
 	i := 0
 	for i < len(steps) {
 		step := steps[i]
@@ -160,6 +188,15 @@ func (p *pipeline) Execute(ctx context.Context, req *engine.DecisionRequest) (*e
 		p.deps.Registry != nil &&
 		p.deps.ShadowAuditWriter != nil {
 		go p.runShadowPolicies(req, features, res)
+	}
+
+	// ── Champion-Challenger ────────────────────────────────────────────────────
+	// Run challenger pipelines concurrently in the background.
+	// The champion's decision (res) is always what gets returned.
+	// Both champion and challenger results are written to cc_audit.
+	if cc := p.policy.ChampionChallenger; cc != nil && cc.Enabled &&
+		p.deps.ShadowAuditWriter != nil {
+		go p.runChallengers(req, features, res, cc)
 	}
 
 	return res, nil
@@ -206,6 +243,114 @@ func (p *pipeline) runShadowPolicies(
 			p.deps.ShadowAuditWriter.WriteShadow(rec)
 		}()
 	}
+}
+
+// runChallengers executes all challenger variants for the champion-challenger
+// experiment.  Each challenger whose traffic bucket matches runs concurrently
+// in a separate goroutine.  The champion's result is passed in so it can be
+// recorded alongside the challenger result in the cc_audit log.
+func (p *pipeline) runChallengers(
+	req *engine.DecisionRequest,
+	features feature.Map,
+	champResult *engine.DecisionResult,
+	cc *ChampionChallengerConfig,
+) {
+	ctx := context.Background() // detached – best effort, must not block caller
+	for _, variant := range cc.Challengers {
+		variant := variant // capture
+		if !inCanary(
+			&CanaryConfig{
+				Enabled:    true,
+				TrafficPct: variant.TrafficPct,
+				HashKey:    variant.HashKey,
+				Salt:       variant.Salt,
+			},
+			req.UserID, req.DeviceID, req.SessionID, req.IP, req.Extra,
+		) {
+			continue
+		}
+
+		go func() {
+			challPipeline := &pipeline{
+				policy: PolicySet{
+					SceneCode: p.policy.SceneCode,
+					Pipeline:  variant.Pipeline,
+					Fallback:  p.policy.Fallback,
+					Strategy:  p.policy.Strategy,
+				},
+				deps: p.deps,
+			}
+			challStart := time.Now()
+			challRes, err := challPipeline.runPipelineSteps(ctx, req, features)
+			challCostMs := time.Since(challStart).Milliseconds()
+			if err != nil || challRes == nil {
+				return
+			}
+
+			rec := audit.NewChampionChallengerRecord(
+				req.RequestID,
+				p.policy.SceneCode,
+				cc.ExperimentID,
+				variant.ChallengerID,
+				req.UserID,
+				req.DeviceID,
+				string(champResult.Decision),
+				champResult.RiskScore,
+				champResult.CostMs,
+				champResult.HitRules,
+				champResult.ModelScores,
+				string(challRes.Decision),
+				challRes.RiskScore,
+				challCostMs,
+				challRes.HitRules,
+				challRes.ModelScores,
+				challRes.RiskReasons,
+			)
+			p.deps.ShadowAuditWriter.WriteCC(rec)
+		}()
+	}
+}
+
+// runPipelineSteps executes only the pipeline steps (no routing, no shadow/cc)
+// and returns the partial DecisionResult.  Used internally by challenger execution.
+func (p *pipeline) runPipelineSteps(
+	ctx context.Context,
+	req *engine.DecisionRequest,
+	features feature.Map,
+) (*engine.DecisionResult, error) {
+	res := &engine.DecisionResult{
+		RequestID:   req.RequestID,
+		Decision:    engine.DecisionPass,
+		ModelScores: make(map[string]float64),
+	}
+	i := 0
+	steps := p.policy.Pipeline
+	for i < len(steps) {
+		step := steps[i]
+		if !step.Parallel {
+			sr, err := p.runStep(ctx, step, req, features)
+			if err != nil || sr == nil {
+				i++
+				continue
+			}
+			if done := p.apply(res, sr, step); done {
+				break
+			}
+			i++
+			continue
+		}
+		j := i
+		for j < len(steps) && steps[j].Parallel {
+			j++
+		}
+		_, done := p.runParallel(ctx, steps[i:j], req, features, res)
+		if done {
+			break
+		}
+		i = j
+	}
+	res.RiskLevel = scoreToLevel(res.RiskScore)
+	return res, nil
 }
 
 // runStep executes a single step with its configured timeout, optional

@@ -113,7 +113,21 @@ type PolicySet struct {
 	// Fallback is the decision returned when the pipeline cannot complete.
 	Fallback engine.Decision
 	// ABTest holds optional A/B experiment configuration.
+	// Use this for symmetric A/B experiments where both groups are stable
+	// production variants.  For gradual rollout, prefer Canary.
 	ABTest *ABTestConfig
+
+	// Canary enables deterministic, hash-based traffic splitting for gradual
+	// policy rollout.  Unlike ABTest (random per request), canary routing is
+	// stable: the same user always lands in the same bucket.
+	Canary *CanaryConfig
+
+	// ChampionChallenger enables simultaneous execution of a challenger policy
+	// alongside the champion (production) pipeline.  Both execute for every
+	// request in the challenger's traffic slice; only the champion's decision
+	// is returned to the caller, but both results are written to audit for
+	// statistical comparison.
+	ChampionChallenger *ChampionChallengerConfig
 
 	// Strategy is the pipeline-level aggregation strategy.
 	// Defaults to HIGHEST_RISK when empty.
