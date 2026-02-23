@@ -1,6 +1,6 @@
 # RiskEngine
 
-[![Go Version](https://img.shields.io/badge/go-1.22+-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourorg/riskengine)](https://goreportcard.com/report/github.com/yourorg/riskengine)
 [![CI](https://github.com/yourorg/riskengine/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/riskengine/actions/workflows/ci.yml)
@@ -12,15 +12,19 @@
 
 ## Features
 
-- **Multi-strategy decision**: Rule engine + ML model scoring + tiered list service + graph risk — orchestrated in a configurable DAG pipeline
+- **Multi-strategy decision**: Rule engine + ML model scoring + list service — orchestrated in a configurable DAG pipeline
 - **Hot-reload**: Rules and models update without service restart; change propagates in < 30 seconds
-- **Expression DSL**: YAML-based rule configuration powered by a type-safe expression evaluator; no DRL expertise required
+- **Self-hosted RiskDSL**: Custom ANTLR4-Go expression language compiled to Go closures at load time; P99 29ns (simple), 97ns (with features), 0 allocs per evaluation
 - **Parallel feature fetching**: All feature sources queried concurrently; per-source timeout degradation never blocks the decision
-- **Velocity counters**: Redis Lua atomic sliding-window counters for rate limiting at any granularity (1min / 1hour / 24h)
-- **Tiered list lookup**: In-process Bloom filter (L1) → Redis (L2) → persistent store (L3); typical list check < 1ms
-- **Champion-Challenger**: Traffic-split A/B testing for rules and ML models with statistical significance tracking
-- **Observability**: Prometheus metrics, OpenTelemetry tracing, structured Zap logging, Kafka audit trail
-- **Cloud-native**: Docker image < 50MB; Kubernetes HPA manifests included; graceful shutdown with drain timeout
+- **Velocity counters**: Redis Lua atomic sliding-window counters at any granularity (1min / 1hour / 24h); backed by `pkg/sliding`
+- **List service**: Redis-backed blacklist / graylist / whitelist with O(1) lookup
+- **A/B testing**: Traffic-split routing per `PolicySet.ABTest`; experiment group tagged in `RiskReasons`; no restart required
+- **Circuit breaker**: `gobreaker`-backed per-step breakers (list, model); state exposed as Prometheus gauge
+- **Rate limiting**: Two-tier token bucket — global (5000 RPS) + per-IP (100 RPS); HTTP 429 on exhaustion
+- **Observability**: Prometheus metrics (decision latency, rule hits, feature errors, active requests), OpenTelemetry tracing headers, structured Zap logging, async audit writer
+- **Health probes**: `/api/v1/livez` (liveness) and `/api/v1/readyz` (readiness with Redis check) for Kubernetes
+- **Dual protocol**: HTTP/JSON (Gin) + gRPC (`DecisionService`: Evaluate / BatchEvaluate / Health)
+- **Cloud-native**: Graceful shutdown with configurable drain timeout; Kubernetes-ready
 
 ---
 
@@ -28,9 +32,9 @@
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - Redis 7+
-- Kafka 3+ (for audit trail; optional in dev mode)
+- Kafka 3+ (for audit trail; optional — dev mode uses structured-log fallback)
 
 ### Run locally
 
@@ -82,18 +86,29 @@ Response:
 ## Architecture
 
 ```
-Request → API Layer (Gin/gRPC)
-               ↓
-         Orchestrator (DAG)
-        ↙       ↓        ↘
-  ListSvc   RuleEngine  ModelEngine
-        ↘       ↓        ↙
-         FeatureService
-               ↓
-    Redis / HBase / External APIs
-               ↓
-         AuditWriter → Kafka
+Request → API Layer (Gin HTTP + gRPC)
+                  ↓
+     RateLimit / Metrics / Tracing Middleware
+                  ↓
+          DecisionEngine
+                  ↓
+          Orchestrator (DAG + A/B routing)
+         ↙         ↓            ↘
+   ListSvc    RuleEngine     ModelEngine
+  (Redis+CB)  (RiskDSL)     (ONNX+CB)
+         ↘         ↓            ↙
+          FeatureService (parallel)
+          ↙        ↓           ↘
+   VelocityFetcher  UserProfile  DeviceInfo
+   (sliding.Window)
+                  ↓
+           Redis (primary store)
+                  ↓
+         AuditWriter (async channel → log / Kafka)
 ```
+
+- **CB** = circuit breaker (gobreaker); trips after 5 consecutive failures, recovers after 30s
+- **A/B routing**: `PolicySet.ABTest.SplitPct` fraction of traffic runs `ExperimentPipeline`
 
 For a detailed architecture and design rationale, see [docs/architecture.md](docs/architecture.md).
 
@@ -107,13 +122,14 @@ Key sections:
 
 | Section | Description |
 |---------|-------------|
-| `server` | HTTP/gRPC listen address, timeouts |
-| `redis` | Connection pool, cluster mode |
-| `kafka` | Brokers, audit topic |
-| `engine` | Scene policies, fallback strategy |
+| `server.addr` | HTTP listen address (default `:8080`) |
+| `server.grpc_addr` | gRPC listen address (default `:9090`) |
+| `redis` | Connection pool, cluster / sentinel mode |
+| `kafka` | Brokers, audit topic (optional) |
+| `engine.policy_dir` | Directory of `*.yaml` PolicySet files |
 | `rules` | Rule groups, hot-reload interval |
-| `models` | ONNX model paths, champion-challenger config |
-| `features` | Fetcher timeouts, velocity window sizes |
+| `models` | ONNX model paths |
+| `feature.redis_timeout` | Per-fetcher Redis timeout (default `10ms`) |
 
 ---
 
@@ -131,7 +147,9 @@ See [docs/adding-rules.md](docs/adding-rules.md) for a step-by-step walkthrough.
 ### Add a feature fetcher
 
 1. Implement `feature.Fetcher` in `internal/feature/fetchers/<name>.go`
-2. Register in `internal/feature/registry.go`
+2. Register via `featureSvc.Register(...)` in `cmd/server/main.go`
+
+See `internal/feature/fetchers/velocity_fetcher.go` as a reference implementation.
 
 ### Add an ML model
 
@@ -145,7 +163,7 @@ The engine hot-loads new/updated models without restart.
 
 ## Performance
 
-Benchmarks run on a 8-core / 32 GB VM (Go 1.22, Redis 7 local):
+Benchmarks run on an 8-core / 32 GB VM (Go 1.24, Redis 7 local):
 
 | Scenario | P50 | P99 | TPS |
 |----------|-----|-----|-----|
@@ -166,26 +184,44 @@ make bench
 
 ```
 riskengine/
-├── cmd/               # Application entry points
-├── internal/          # Private application code
-│   ├── engine/        # Top-level decision orchestration
-│   ├── rule/          # Rule DSL, evaluator, hot-reload
-│   ├── feature/       # Parallel feature fetching
-│   ├── model/         # ONNX inference, champion-challenger
-│   ├── list/          # Tiered list service (Bloom+Redis+DB)
-│   ├── orchestrator/  # DAG executor, A/B router
-│   ├── audit/         # Kafka audit writer
-│   └── config/        # Config loader
-├── pkg/               # Public, reusable packages
-│   ├── expr/          # Expression evaluator
-│   ├── sliding/       # Redis sliding-window velocity
-│   ├── bloom/         # In-process Bloom filter
-│   └── pool/          # Goroutine pool for CGO isolation
-├── api/               # HTTP handlers and protobuf definitions
-├── configs/           # YAML config templates, rules, models
-├── deployments/       # Docker and Kubernetes manifests
-├── docs/              # Architecture docs, ADRs
-└── scripts/           # Build, lint, benchmark scripts
+├── cmd/server/            # Application entry point (main.go)
+├── internal/              # Private application code
+│   ├── engine/            # Top-level DecisionEngine, request lifecycle
+│   ├── rule/              # Rule storage, evaluator, hot-reload
+│   ├── feature/           # Parallel feature fetching
+│   │   └── fetchers/      # Concrete fetchers (VelocityFetcher, ...)
+│   ├── model/             # Model registry, ONNX scorer interface
+│   ├── list/              # Redis-backed list service (blacklist/graylist)
+│   ├── orchestrator/      # DAG executor, A/B routing, policy registry
+│   ├── audit/             # Async channel audit writer (→ log / Kafka)
+│   ├── metrics/           # Prometheus collectors
+│   ├── middleware/         # Gin middleware (RequestID, Metrics, RateLimit, Logger, Tracing)
+│   ├── health/            # Liveness / readiness checkers
+│   ├── resilience/        # Circuit breaker (gobreaker wrapper)
+│   └── config/            # Config loader
+├── pkg/                   # Public, reusable packages
+│   ├── dsl/               # Self-hosted RiskDSL (ANTLR4-Go, AST, codegen)
+│   │   ├── grammar/       # RiskDSL.g4 grammar file
+│   │   ├── parser/        # ANTLR4-generated parser (do not edit)
+│   │   ├── ast/           # AST node types
+│   │   └── builtins/      # Built-in risk functions (inList, velocity, ...)
+│   ├── sliding/           # Redis Lua sliding-window velocity counter
+│   ├── bloom/             # In-process Bloom filter
+│   └── pool/              # Object pool utilities
+├── api/
+│   ├── grpc/              # proto definitions + generated code + server impl
+│   │   ├── proto/         # decision.proto
+│   │   ├── v1/            # protoc-generated Go (decision.pb.go, *_grpc.pb.go)
+│   │   └── server/        # DecisionServer implementation
+│   └── http/              # Gin HTTP handlers
+│       ├── v1/            # Decision API, health, livez, readyz
+│       └── admin/v1/      # Rule management CRUD API
+├── configs/
+│   ├── config.example.yaml
+│   └── policies/          # PolicySet YAML files (loaded at startup)
+├── deployments/           # Docker and Kubernetes manifests
+├── docs/                  # Architecture docs, design documents
+└── openspec/              # Change proposals and design specs
 ```
 
 ---
@@ -213,6 +249,9 @@ Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgements
 
-- [antonmedv/expr](https://github.com/antonmedv/expr) – expression evaluator
+- [antlr/antlr4](https://github.com/antlr/antlr4) + [antlr4-go/antlr](https://github.com/antlr/antlr4/tree/master/runtime/Go/antlr) – RiskDSL parser runtime
 - [bits-and-blooms/bloom](https://github.com/bits-and-blooms/bloom) – Bloom filter
+- [sony/gobreaker](https://github.com/sony/gobreaker) – circuit breaker
+- [prometheus/client_golang](https://github.com/prometheus/client_golang) – metrics
+- [redis/go-redis](https://github.com/redis/go-redis) – Redis client
 - Design inspired by industry practices at Bilibili, ByteDance, and Meituan risk teams
