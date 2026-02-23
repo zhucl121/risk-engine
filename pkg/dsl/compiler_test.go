@@ -5,6 +5,7 @@ package dsl_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,8 +35,18 @@ func newTestRegistry(tb testHelper) *dsl.FunctionRegistry {
 
 func newRuntime(features map[string]feature.Value, amount int64) *dsl.Runtime {
 	rt := dsl.AcquireRuntime()
-	rt.Features = feature.Map(features)
-	rt.Request = &engine.DecisionRequest{Amount: amount, UserID: "u1", IP: "1.2.3.4"}
+	fm := make(feature.Map)
+	for k, v := range features {
+		fm[k] = v
+	}
+	// amount is now a business field carried via Extra / injected into feature map.
+	extra := make(map[string]string)
+	if amount != 0 {
+		fm["extra.amount"] = feature.Value{Kind: feature.KindInt, IntVal: amount}
+		extra["amount"] = fmt.Sprintf("%d", amount)
+	}
+	rt.Features = fm
+	rt.Request = &engine.DecisionRequest{UserID: "u1", IP: "1.2.3.4", Extra: extra}
 	return rt
 }
 

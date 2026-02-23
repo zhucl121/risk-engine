@@ -37,6 +37,11 @@ type HealthStatus struct {
 }
 
 // DecisionRequest carries all input data for a single risk evaluation.
+//
+// Design: only universal identity/routing fields are promoted to top-level.
+// All scene-specific business data (e.g. amount, merchant_id, order_type)
+// must be passed via Extra so the engine remains domain-agnostic and
+// applicable to non-payment scenarios (login, account, content risk, etc.).
 type DecisionRequest struct {
 	// RequestID is a UUID v4 set by the caller; generated if empty.
 	RequestID string
@@ -46,10 +51,8 @@ type DecisionRequest struct {
 	DeviceID   string
 	SessionID  string
 	IP         string
-	// Amount is the transaction amount in the smallest currency unit (cents).
-	// Zero for non-monetary scenes.
-	Amount     int64
-	// Extra holds scene-specific key-value pairs.
+	// Extra holds all scene-specific key-value pairs, including business
+	// fields such as "amount", "merchant_id", "order_type", etc.
 	Extra      map[string]string
 	ReceivedAt time.Time
 }

@@ -172,7 +172,8 @@ func TestParamMapping_RequestFields(t *testing.T) {
 		Kind: orchestrator.StepKindRule,
 		ParamMapping: orchestrator.ParamMapping{
 			"uid": "request.user_id",
-			"amt": "request.amount",
+			// amount is now carried via Extra; use extra.amount source expression.
+			"amt": "extra.amount",
 		},
 	}
 	pipe := newExtraPipeline(nil, step, capture)
@@ -180,11 +181,12 @@ func TestParamMapping_RequestFields(t *testing.T) {
 	_, err := pipe.Execute(context.Background(), &engine.DecisionRequest{
 		SceneCode: "test",
 		UserID:    "u999",
-		Amount:    5000,
+		Extra:     map[string]string{"amount": "5000"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "u999", capture.captured.GetString("uid"))
-	assert.Equal(t, int64(5000), capture.captured.GetInt("amt"))
+	// amount is injected as extra.amount string; resolveSource returns string value.
+	assert.Equal(t, "5000", capture.captured.GetString("amt"))
 }
 
 // ── ExtraParamLoader integration ──────────────────────────────────────────────

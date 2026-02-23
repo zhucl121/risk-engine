@@ -76,7 +76,6 @@ func protoToEngineReq(req *riskv1.DecisionRequest) *engine.DecisionRequest {
 		DeviceID:   req.DeviceId,
 		SessionID:  req.SessionId,
 		IP:         req.Ip,
-		Amount:     req.Amount,
 		Extra:      req.Extra,
 		ReceivedAt: time.Now(),
 	}

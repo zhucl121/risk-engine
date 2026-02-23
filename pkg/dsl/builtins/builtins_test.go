@@ -29,12 +29,7 @@ func eval(t *testing.T, reg *dsl.FunctionRegistry, expr string, features map[str
 	}
 	rt := dsl.AcquireRuntime()
 	defer dsl.ReleaseRuntime(rt)
-	rt.Request = &engine.DecisionRequest{Amount: 100, UserID: "u1"}
-	// Inject feature values via map.
-	featureMap := make(map[string]interface{})
-	for k, v := range features {
-		featureMap[k] = v
-	}
+	rt.Request = &engine.DecisionRequest{UserID: "u1"}
 	return prog.Run(context.Background(), rt)
 }
 

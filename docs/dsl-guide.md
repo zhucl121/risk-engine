@@ -53,21 +53,48 @@ DSL 支持以下基础类型：
 
 ## 内置变量（请求字段）
 
-以下标识符直接映射到 `DecisionRequest` 的字段，无需前缀即可使用：
+`DecisionRequest` 只保留通用身份/路由字段作为顶层字段，业务字段（金额、商户号、订单类型等）全部通过 `Extra` 传入，使引擎保持场景无关性。
+
+**顶层变量**（无需前缀，直接使用）：
 
 | 变量名 | 类型 | 说明 |
 |--------|------|------|
-| `amount` | `int` | 交易金额（分） |
 | `userID` | `string` | 用户唯一标识 |
 | `deviceID` | `string` | 设备指纹 |
 | `ip` | `string` | 请求来源 IP |
-| `phone` | `string` | 手机号（来自 `Extra["phone"]`） |
+
+**Extra 快捷访问变量**（等价于 `features['extra.xxx']`）：
+
+| 变量名 | 类型 | 来源 | 说明 |
+|--------|------|------|------|
+| `amount` | `int` | `Extra["amount"]` | 交易金额（分），由调用方通过 Extra 传入 |
+| `phone` | `string` | `Extra["phone"]` | 手机号 |
+
+> `amount` 和 `phone` 是 DSL 提供的方便别名，等价于 `features['extra.amount']` / `features['extra.phone']`。  
+> 其他 Extra 字段统一用 `features['extra.<key>']` 访问。
 
 **示例：**
 ```
 amount > 100000
 userID == 'u_12345'
 ip != '127.0.0.1'
+features['extra.merchant_id'] == 'M001'
+features['extra.channel'] in ['ALIPAY', 'WECHAT']
+```
+
+**调用方传参示例（HTTP）：**
+```json
+{
+  "scene_code": "PAYMENT_CHECKOUT",
+  "user_id": "u_12345",
+  "ip": "1.2.3.4",
+  "extra": {
+    "amount": "100000",
+    "merchant_id": "M001",
+    "channel": "ALIPAY",
+    "phone": "13800138000"
+  }
+}
 ```
 
 ---

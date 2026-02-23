@@ -68,8 +68,6 @@ func resolveSource(src string, req *engine.DecisionRequest, features feature.Map
 		return feature.Value{Kind: feature.KindString, StrVal: req.IP}
 	case src == "request.session_id":
 		return feature.Value{Kind: feature.KindString, StrVal: req.SessionID}
-	case src == "request.amount":
-		return feature.Value{Kind: feature.KindInt, IntVal: req.Amount}
 	}
 	// Literal constant.
 	return feature.Value{Kind: feature.KindString, StrVal: src}

@@ -158,19 +158,24 @@ func TestDSLRule_Evaluate(t *testing.T) {
 	require.Len(t, rules, 1)
 
 	rctx := &rule.Context{
-		Request:  &engine.DecisionRequest{Amount: 200},
-		Features: feature.Map{},
+		Request: &engine.DecisionRequest{
+			Extra: map[string]string{"amount": "200"},
+		},
+		Features: feature.Map{
+			"extra.amount": feature.Value{Kind: feature.KindInt, IntVal: 200},
+		},
 	}
 
-	// Amount 200 > 100: rule should hit.
+	// amount 200 > 100: rule should hit.
 	res, err := rules[0].Evaluate(ctx, rctx)
 	require.NoError(t, err)
 	assert.True(t, res.Hit)
 	assert.Equal(t, engine.DecisionReject, res.Decision)
 	assert.Equal(t, "HIGH_AMOUNT", res.RiskCode)
 
-	// Amount 50 <= 100: rule should not hit.
-	rctx.Request.Amount = 50
+	// amount 50 <= 100: rule should not hit.
+	rctx.Request.Extra["amount"] = "50"
+	rctx.Features["extra.amount"] = feature.Value{Kind: feature.KindInt, IntVal: 50}
 	res, err = rules[0].Evaluate(ctx, rctx)
 	require.NoError(t, err)
 	assert.False(t, res.Hit)

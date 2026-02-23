@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/yourorg/riskengine/internal/feature"
 	"github.com/yourorg/riskengine/pkg/dsl/ast"
 )
 
@@ -230,10 +231,31 @@ func (g *codegenVisitor) genIdent(n *ast.Ident) (evalFn, error) {
 	line, col := n.Line, n.Col
 
 	// Known top-level request variables.
+	// amount, phone and other business fields are read from Extra so that
+	// DecisionRequest stays domain-agnostic.  The DSL shorthand identifiers
+	// below are convenience aliases — they are equivalent to using the
+	// features['extra.<key>'] form but without requiring explicit injection.
 	switch name {
 	case "amount":
+		// Reads Extra["amount"] as int64; returns 0 when absent or non-numeric.
 		return func(_ context.Context, rt *Runtime) (Value, error) {
-			return IntValue(rt.Request.Amount), nil
+			raw, ok := rt.Request.Extra["amount"]
+			if !ok || raw == "" {
+				return IntValue(0), nil
+			}
+			// Try the already-injected feature map first (typed).
+			if fv, ok2 := rt.Features["extra.amount"]; ok2 {
+				switch fv.Kind {
+				case feature.KindInt:
+					return IntValue(fv.IntVal), nil
+				case feature.KindFloat:
+					return IntValue(int64(fv.FltVal)), nil
+				}
+			}
+			// Fall back to string parse.
+			var n int64
+			_, _ = fmt.Sscanf(raw, "%d", &n)
+			return IntValue(n), nil
 		}, nil
 	case "userID":
 		return func(_ context.Context, rt *Runtime) (Value, error) {

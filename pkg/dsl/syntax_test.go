@@ -5,9 +5,11 @@ package dsl_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/yourorg/riskengine/internal/engine"
+	"github.com/yourorg/riskengine/internal/feature"
 	"github.com/yourorg/riskengine/pkg/dsl"
 	"github.com/yourorg/riskengine/pkg/dsl/builtins"
 )
@@ -29,7 +31,12 @@ func runDSL(t *testing.T, reg *dsl.FunctionRegistry, expr string, amount int64) 
 	}
 	rt := dsl.AcquireRuntime()
 	defer dsl.ReleaseRuntime(rt)
-	rt.Request = &engine.DecisionRequest{Amount: amount}
+	rt.Request = &engine.DecisionRequest{
+		Extra: map[string]string{"amount": fmt.Sprintf("%d", amount)},
+	}
+	rt.Features = feature.Map{
+		"extra.amount": feature.Value{Kind: feature.KindInt, IntVal: amount},
+	}
 	got, err := prog.Run(context.Background(), rt)
 	if err != nil {
 		t.Fatalf("run %q: %v", expr, err)
@@ -68,7 +75,12 @@ func TestTernaryOperator(t *testing.T) {
 	}
 	rt := dsl.AcquireRuntime()
 	defer dsl.ReleaseRuntime(rt)
-	rt.Request = &engine.DecisionRequest{Amount: 100}
+	rt.Request = &engine.DecisionRequest{
+		Extra: map[string]string{"amount": "100"},
+	}
+	rt.Features = feature.Map{
+		"extra.amount": feature.Value{Kind: feature.KindInt, IntVal: 100},
+	}
 	// Run will fail because root must be bool; verify the error is informative.
 	_, runErr := prog.Run(context.Background(), rt)
 	if runErr == nil {

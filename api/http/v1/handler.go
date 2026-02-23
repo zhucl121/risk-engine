@@ -45,6 +45,9 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 // decisionRequest is the JSON body for POST /api/v1/decision.
+//
+// All scene-specific business fields (amount, merchant_id, order_type, etc.)
+// must be placed in the extra map, keeping the top-level envelope domain-agnostic.
 type decisionRequest struct {
 	RequestID string            `json:"request_id"`
 	SceneCode string            `json:"scene_code" binding:"required"`
@@ -52,7 +55,6 @@ type decisionRequest struct {
 	DeviceID  string            `json:"device_id"`
 	SessionID string            `json:"session_id"`
 	IP        string            `json:"ip"`
-	Amount    int64             `json:"amount"`
 	Extra     map[string]string `json:"extra"`
 }
 
@@ -88,7 +90,6 @@ func (h *Handler) Evaluate(c *gin.Context) {
 		DeviceID:   req.DeviceID,
 		SessionID:  req.SessionID,
 		IP:         req.IP,
-		Amount:     req.Amount,
 		Extra:      req.Extra,
 		ReceivedAt: time.Now(),
 	}
